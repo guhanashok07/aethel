@@ -59,6 +59,7 @@ const initialToday = new Date();
 export default function App() {
     // Navigation / View Switcher State
     const [activeView, setActiveView] = useState('board');
+    console.log("Aethel loaded successfully.");
 
     // Global Database Sync States
     const [currentUser, setCurrentUser] = useState(null);
