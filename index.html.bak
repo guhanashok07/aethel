@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow — Intention Board & Grid</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter, Caveat (hand-written logo), & DM Serif Display (editorial headers) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Dashboard Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Phosphor Icons for Timetable Grid -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        caveat: ['Caveat', 'cursive'],
+                        serif: ['DM Serif Display', 'serif'],
+                    },
+                    colors: {
+                        cream: '#FDFDFC',
+                        'muted-grey': '#F5F5F5',
+                        'dark-text': '#1F1F1F',
+                        'subtle-text': '#888888',
+                        'hover-bg': '#F0F3F6',
+                        'accent-subtle': '#F0F0F0',
+                        'charcoal': '#1A1A1A',
+                        // Timetable specific colors
+                        canvas: '#fdfbfa',      // Fresh warm linen alabaster background
+                        panel: '#f6f2eb',       // Soft warm oatmeal panel
+                        border: '#e6ded4',      // Soft earth gray/sand border
+                        muted: '#7d7162',       // Warm sand-drab for secondary text
+                        sand: '#2b241e',        // Rich chicory espresso for high-contrast primary text
+                        accent: {
+                            terracotta: '#bd5338', // Deep organic terracotta
+                            sage: '#5c6e4f',       // Warm herbal sage
+                            sand: '#2b241e',       // Primary highlights & text
+                            ochre: '#a87834',      // Soft morning ochre
+                            charcoal: '#4a433b',   // Elegant warm charcoal for sleep elements
+                            clay: '#736253'        // Warm clay
+                        }
+                    },
+                    boxShadow: {
+                        'subtle': '0 2px 8px rgba(0, 0, 0, 0.015)',
+                        'board': '0 4px 20px rgba(0, 0, 0, 0.02)',
+                        'board-hover': '0 6px 24px rgba(0, 0, 0, 0.04)',
+                        'ghost': '0 10px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.03)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: theme('colors.cream');
+            color: theme('colors.dark-text');
+            font-family: 'Inter', sans-serif;
+            overflow: hidden; /* Prevent body scroll to let child containers scroll independently */
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #E0E0E0;
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #D0D0D0;
+        }
+
+        /* Custom elegant light-scrollbar styling for Timetable */
+        .timetable-scrollbar::-webkit-scrollbar-track {
+            background: #f6f2eb;
+        }
+
+        .timetable-scrollbar::-webkit-scrollbar-thumb {
+            background: #e6ded4;
+            border-radius: 10px;
+        }
+
+        .timetable-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #7d7162;
+        }
+
+        /* Hover-only scrollbar */
+        .scroll-hidden-until-hover::-webkit-scrollbar-thumb {
+            background: transparent;
+        }
+
+        .scroll-hidden-until-hover:hover::-webkit-scrollbar-thumb {
+            background: #E0E0E0;
+        }
+
+        /* Board Card Styling */
+        .board-container {
+            border-radius: 1rem;
+            background-color: #ffffff;
+            border: 1px solid rgba(0, 0, 0, 0.03);
+            box-shadow: theme('boxShadow.board');
+            padding: 16px;
+            transition: all 0.2s ease;
+        }
+
+        .board-container:hover {
+            box-shadow: theme('boxShadow.board-hover');
+            border-color: rgba(0, 0, 0, 0.06);
+        }
+
+        .board-container.drag-over {
+            background-color: #F5F5F5 !important;
+            border-color: #E5E5E5 !important;
+            box-shadow: inset 0 0 0 1px #E5E5E5, 0 6px 20px rgba(0, 0, 0, 0.03) !important;
+            transform: translateY(-2px);
+        }
+
+        .task-card {
+            transition: transform 0.1s ease, opacity 0.1s ease, background-color 0.2s ease;
+            border-radius: 6px;
+            position: relative;
+            cursor: grab;
+        }
+
+        .task-card:active {
+            cursor: grabbing !important;
+        }
+
+        .task-card.dragging {
+            background-color: #F8FAFC !important;
+            border: 2px dashed #CBD5E1 !important;
+            opacity: 1 !important;
+        }
+
+        .task-card.dragging * {
+            opacity: 0 !important;
+        }
+
+        .editable-text,
+        .add-task-input {
+            width: 100%;
+            background: transparent;
+            border: none;
+            border-bottom: 1px dashed #E5E7EB;
+            padding-bottom: 6px;
+            font-size: 13.5px;
+            line-height: 20px;
+            outline: none;
+        }
+
+        .task-checkbox-wrapper {
+            position: absolute;
+            right: 0;
+            top: 4px;
+            display: flex;
+            align-items: center;
+        }
+
+        .task-checkbox {
+            width: 14px;
+            height: 14px;
+            border: 1.5px solid #d1d5db;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffffff;
+        }
+
+        .task-checkbox-inner {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background-color: #4b5563;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .task-checkbox:hover .task-checkbox-inner {
+            opacity: 1;
+        }
+
+        .fade-enter {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(3px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col antialiased selection:bg-gray-200 selection:text-black">
+
+    <!-- Navbar -->
+    <nav class="flex items-center justify-between px-8 py-3.5 bg-charcoal text-white sticky top-0 z-50 shadow-sm shrink-0">
+        <!-- Date display and Sync Status -->
+        <div class="w-1/3 flex items-center justify-start gap-3">
+            <span class="text-[13px] font-medium" id="current-date-display"></span>
+            <span id="cloud-sync-indicator"
+                class="text-[10px] text-gray-400 opacity-0 transition-opacity flex items-center gap-1">
+                <i class="fa-solid fa-cloud"></i> Synced
+            </span>
+        </div>
+
+        <!-- Center Brand Logo -->
+        <div class="w-1/3 flex items-center justify-center gap-2 cursor-pointer group" onclick="location.reload()">
+            <div class="w-1.5 h-1.5 rounded-full bg-white group-hover:scale-125 transition-transform"></div>
+            <h1 class="text-[26px] font-caveat font-semibold tracking-wider text-white group-hover:text-gray-200 transition-colors mt-1">
+                Flow
+            </h1>
+        </div>
+
+        <!-- Right Side: View Selector + Archive + Settings -->
+        <div class="flex gap-6 items-center text-[17px] text-gray-300 w-1/3 justify-end">
+            <!-- View Selector tabs -->
+            <div class="flex bg-white/10 p-0.5 rounded-lg border border-white/5 text-xs mr-2 select-none">
+                <button id="tab-board" onclick="switchView('board')" class="px-3 py-1 rounded font-semibold bg-white text-charcoal shadow-sm transition-all duration-200">
+                    Board
+                </button>
+                <button id="tab-schedule" onclick="switchView('schedule')" class="px-3 py-1 rounded font-medium text-gray-300 hover:text-white transition-all duration-200">
+                    Schedule
+                </button>
+            </div>
+            
+            <button onclick="toggleArchive()" title="Archive"><i class="fa-solid fa-box-archive"></i></button>
+            <button title="Settings"><i class="fa-solid fa-gear"></i></button>
+        </div>
+    </nav>
+
+    <!-- Combined Main Content Viewport -->
+    <div class="flex-1 flex flex-col overflow-hidden relative">
+        
+        <!-- View 1: To-Do Dashboard (Kanban Board View) -->
+        <main id="board-view-container" class="flex-1 overflow-y-auto px-8 pt-10 pb-16 flex flex-col gap-12 max-w-[1800px] mx-auto w-full">
+            <!-- Focus Section -->
+            <section class="flex flex-col w-full dashboard-section">
+                <header class="mb-4 flex justify-between items-end border-b border-gray-200/60 pb-2 group">
+                    <div class="flex items-center gap-2 cursor-pointer"
+                        onclick="toggleSection('focus-content', 'focus-icon')">
+                        <i id="focus-icon" class="fa-solid fa-chevron-down text-[10px] text-gray-400"></i>
+                        <h2 class="text-xs font-bold tracking-widest text-gray-500 uppercase">Focus</h2>
+                    </div>
+                </header>
+                <div id="focus-content" class="pb-2">
+                    <div class="flex gap-6 overflow-x-auto pb-4 scroll-hidden-until-hover" id="focus-boards"></div>
+                </div>
+            </section>
+
+            <!-- Spaces Section -->
+            <section class="flex flex-col w-full dashboard-section">
+                <header class="mb-4 flex justify-between items-end border-b border-gray-200/60 pb-2 group">
+                    <div class="flex items-center gap-2 cursor-pointer"
+                        onclick="toggleSection('spaces-content', 'spaces-icon')">
+                        <i id="spaces-icon" class="fa-solid fa-chevron-down text-[10px] text-gray-400"></i>
+                        <h2 class="text-xs font-bold tracking-widest text-gray-500 uppercase">Spaces</h2>
+                    </div>
+                    <button onclick="addCustomBucket()"
+                        class="text-xs font-medium text-gray-500 hover:text-dark-text flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus text-[10px]"></i> New Space
+                    </button>
+                </header>
+                <div id="spaces-content">
+                    <div class="flex gap-6 overflow-x-auto pb-4 scroll-hidden-until-hover" id="custom-boards"></div>
+                </div>
+            </section>
+
+            <!-- Timeline Section -->
+            <section class="flex flex-col w-full dashboard-section">
+                <header class="mb-4 flex justify-between items-end border-b border-gray-200/60 pb-2">
+                    <div class="flex items-center gap-2 cursor-pointer"
+                        onclick="toggleSection('timeline-content', 'timeline-icon')">
+                        <i id="timeline-icon" class="fa-solid fa-chevron-down text-[10px] text-gray-400"></i>
+                        <h2 class="text-xs font-bold tracking-widest text-gray-500 uppercase">Timeline</h2>
+                    </div>
+                    <div class="flex items-center gap-3 text-gray-400">
+                        <button onclick="shiftDate(-7)"><i class="fa-solid fa-chevron-left text-[10px]"></i></button>
+                        <button onclick="shiftDate(0)"><i class="fa-solid fa-circle-dot text-[9px]"></i></button>
+                        <button onclick="shiftDate(7)"><i class="fa-solid fa-chevron-right text-[10px]"></i></button>
+                    </div>
+                </header>
+                <div id="timeline-content">
+                    <div class="flex gap-6 overflow-x-auto pb-4 scroll-hidden-until-hover" id="timeline-boards"></div>
+                </div>
+            </section>
+        </main>
+
+        <!-- View 2: Intention Grid (Horizontal Timetable View) -->
+        <div id="schedule-view-container" class="hidden flex-1 flex flex-col lg:flex-row overflow-hidden bg-canvas text-sand font-sans h-full">
+            
+            <!-- Sidebar: Focus Metrics, Active Task, Startup Milestones, and Buckets -->
+            <aside class="w-full lg:w-96 bg-panel border-b lg:border-b-0 lg:border-r border-border p-6 flex flex-col justify-between overflow-y-auto shrink-0 z-30 timetable-scrollbar">
+                <div>
+                    <!-- Sidebar Header Brand -->
+                    <div class="flex items-center justify-between mb-8">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-accent-terracotta flex items-center justify-center text-canvas font-bold text-sm shadow-sm">
+                                F
+                            </div>
+                            <div>
+                                <h2 class="font-serif italic text-2xl tracking-tight text-stone-900 leading-none">Schedule</h2>
+                                <p class="text-[10px] text-muted tracking-widest uppercase mt-1 font-semibold">Intention Navigator</p>
+                            </div>
+                        </div>
+                        <div class="px-2.5 py-1 rounded bg-border/50 text-[11px] text-muted flex items-center gap-1.5 font-medium border border-border/20">
+                            <span class="w-1.5 h-1.5 rounded-full bg-accent-sage animate-ping"></span>
+                            June 2026
+                        </div>
+                    </div>
+
+                    <!-- Focus Status Card -->
+                    <div id="zen-focus-card" class="bg-canvas border border-border/70 rounded-xl p-5 mb-5 relative overflow-hidden group shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <div class="absolute top-0 right-0 w-32 h-32 bg-accent-ochre/5 rounded-full filter blur-xl group-hover:bg-accent-ochre/10 transition-all"></div>
+                        
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-[10px] uppercase tracking-wider text-muted font-semibold">Current Flow State</span>
+                            <span id="zen-time-badge" class="px-2 py-0.5 rounded-full text-[10px] bg-accent-ochre/10 text-accent-ochre border border-accent-ochre/25 font-mono font-medium">06:00 - 07:30</span>
+                        </div>
+                        
+                        <h3 id="zen-activity-name" class="font-serif text-xl italic text-stone-900 mb-1">Morning Routine</h3>
+                        <p id="zen-subtext" class="text-xs text-muted mb-4">Start your day slowly, intentionally, and without devices.</p>
+                        
+                        <!-- Quick Checklist Tracker embedded inside Zen View -->
+                        <div id="zen-checklist" class="space-y-2 mb-4 bg-panel/50 p-3 rounded-lg border border-border/30">
+                            <!-- Dynamic Checklist Inserted Here -->
+                        </div>
+
+                        <!-- Live Timer Progress Bar -->
+                        <div class="space-y-1">
+                            <div class="flex justify-between text-[11px] text-muted font-medium">
+                                <span id="zen-timer-elapsed">45m elapsed</span>
+                                <span id="zen-timer-remaining">45m left</span>
+                            </div>
+                            <div class="w-full h-1.5 bg-border rounded-full overflow-hidden">
+                                <div id="zen-progress-bar" class="h-full bg-accent-ochre transition-all duration-1000" style="width: 50%;"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Startup Launch Task Card -->
+                    <div id="startup-checklist-card" class="bg-canvas border border-border/70 rounded-xl p-5 mb-6 shadow-sm hover:shadow-md transition-shadow duration-300">
+                        <div class="flex items-center justify-between mb-3 border-b border-border/50 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-accent-terracotta"></span>
+                                <h3 class="font-serif italic text-lg text-stone-900">Startup Milestones</h3>
+                            </div>
+                            <span id="startup-count" class="text-[10px] text-muted font-bold font-mono">0/4 done</span>
+                        </div>
+                        
+                        <!-- Quick Add Input -->
+                        <div class="flex gap-2 mb-3">
+                            <input type="text" id="new-startup-task" placeholder="Next milestone..." class="flex-1 bg-panel border border-border rounded-lg px-2.5 py-1 text-xs text-stone-900 placeholder:text-muted/60 focus:outline-none focus:border-accent-terracotta transition">
+                            <button onclick="addStartupTask()" class="px-2.5 py-1 bg-accent-terracotta text-white rounded-lg text-xs font-semibold hover:opacity-90 transition">Add</button>
+                        </div>
+
+                        <!-- Task List Container -->
+                        <div id="startup-tasks-container" class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                            <!-- Dynamic startup task checklist loaded here -->
+                        </div>
+                    </div>
+
+                    <!-- Daily Allocations (The "Buckets") -->
+                    <div class="space-y-4 mb-8">
+                        <div class="flex items-center justify-between">
+                            <h2 class="text-xs uppercase tracking-widest text-muted font-bold">Time Allocation Buckets</h2>
+                            <span class="text-xs text-muted font-mono font-semibold">24 Hours / Day</span>
+                        </div>
+                        
+                        <div class="space-y-2.5" id="allocation-buckets-container">
+                            <!-- Dynamic Buckets will be rendered here -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Customizer Drawer Option & Quick Info -->
+                <div class="pt-6 border-t border-border/60">
+                    <div class="p-3 bg-canvas border border-border rounded-lg text-xs text-muted leading-relaxed shadow-sm font-medium">
+                        <p class="font-semibold text-stone-900 mb-1">💡 Rhythm Principle</p>
+                        Your days have a natural ebb and flow. Toggle task blocks or adjust the budget to realign your weekly balance.
+                    </div>
+                    <div class="mt-4 flex justify-between items-center text-[11px] text-muted font-medium">
+                        <span>© Flow Systems 2026</span>
+                        <span onclick="resetBudgetDefaultsAndRefresh()" class="hover:text-stone-900 cursor-pointer transition underline decoration-dotted font-medium">Reset Defaults</span>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Main Content Area: Horizontal Timetable Row Grid -->
+            <main class="flex-1 flex flex-col h-full bg-canvas overflow-hidden">
+                
+                <!-- Header Ribbon: Date Controls, Today and Filters -->
+                <header class="h-16 border-b border-border px-6 flex items-center justify-between shrink-0 z-20 bg-canvas/85 backdrop-blur-md">
+                    <div class="flex items-center gap-4">
+                        <button onclick="changeWeek(-1)" class="p-1.5 rounded hover:bg-panel border border-transparent hover:border-border text-muted hover:text-stone-900 transition">
+                            <i class="ph ph-caret-left text-lg"></i>
+                        </button>
+                        <div class="text-sm font-semibold text-stone-900 font-serif italic tracking-wide text-lg" id="current-date-range-display">
+                            June 16 – June 22, 2026
+                        </div>
+                        <button onclick="changeWeek(1)" class="p-1.5 rounded hover:bg-panel border border-transparent hover:border-border text-muted hover:text-stone-900 transition">
+                            <i class="ph ph-caret-right text-lg"></i>
+                        </button>
+                        <button onclick="goToToday()" class="px-3 py-1 bg-panel text-sand rounded text-xs font-semibold hover:bg-border transition border border-border/40 hover:text-stone-900 shadow-sm">
+                            Go to June 16 (Today)
+                        </button>
+                    </div>
+
+                    <div class="flex items-center gap-3">
+                        <!-- View Selector -->
+                        <div class="flex bg-panel p-1 rounded-lg border border-border select-none">
+                            <button id="view-week" class="px-3 py-1 rounded text-xs font-semibold bg-canvas text-stone-950 shadow-sm transition">Week</button>
+                            <button id="view-day" class="px-3 py-1 rounded text-xs font-medium text-muted hover:text-sand transition">Day</button>
+                        </div>
+                        
+                        <!-- Adjust Budget Button -->
+                        <button onclick="openCustomizerModal()" class="px-3 py-1.5 bg-accent-terracotta text-white rounded text-xs font-semibold hover:opacity-90 transition flex items-center gap-1.5 shadow-sm">
+                            <i class="ph ph-sliders-horizontal"></i>
+                            Adjust Budget
+                        </button>
+                    </div>
+                </header>
+
+                <!-- The Horizontal Scroll View Container -->
+                <div class="flex-1 overflow-auto relative select-none timetable-scrollbar" id="timetable-scroll-container">
+                    <!-- Fixed Width container sizing: Day sticky label (112px) + 24 Hours * 80px per hour = 2032px -->
+                    <div class="w-[2032px] h-full flex flex-col relative" id="timetable-canvas">
+                        
+                        <!-- Sticky Horizontal Header: Displays hours from left to right -->
+                        <div class="flex border-b border-border/50 sticky top-0 bg-canvas/95 backdrop-blur-md z-20 shadow-sm h-12">
+                            <!-- Left Corner Spacer: Matches Day header width -->
+                            <div class="w-28 shrink-0 border-r border-border bg-panel flex items-center justify-center text-[10px] font-bold text-muted uppercase tracking-widest">
+                                Timeline
+                            </div>
+                            
+                            <!-- Hours horizontal indicators -->
+                            <div class="flex-1 relative" id="hour-header-grid">
+                                <!-- Generated Dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- Scrollable body: Days stack as rows, scrollable horizontally through hours -->
+                        <div class="flex-1 relative">
+                            
+                            <!-- Hourly vertical background grid lines (underneath elements) -->
+                            <div class="absolute inset-y-0 left-28 right-0 z-0 pointer-events-none" id="vertical-grid-lines">
+                                <!-- Generated Dynamically by JS -->
+                            </div>
+
+                            <!-- Main Day Rows Container -->
+                            <div class="absolute inset-0 z-10 flex flex-col" id="day-rows-container">
+                                <!-- Days and their scheduled horizontal blocks stacked vertically -->
+                            </div>
+
+                            <!-- Current Time Indicator Line (Vertical slider) -->
+                            <div id="current-time-marker" class="absolute top-0 bottom-0 w-0.5 border-l-2 border-accent-terracotta z-15 pointer-events-none flex flex-col items-center transition-all duration-300">
+                                <span class="w-2.5 h-2.5 rounded-full bg-accent-terracotta -mt-1 shadow-sm"></span>
+                                <div class="bg-accent-terracotta text-white text-[9px] px-1.5 rounded mt-1 font-bold leading-none py-0.5 shadow-md whitespace-nowrap">LIVE TIME</div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+    </div>
+
+    <!-- Modals Section -->
+
+    <!-- Modal 1: Archive Modal -->
+    <div id="archive-modal" class="fixed inset-0 bg-cream/95 backdrop-blur-md z-[60] hidden flex-col">
+        <div class="flex justify-between items-center px-8 py-6 border-b border-gray-200">
+            <h2 class="text-lg font-medium">Archive</h2>
+            <button onclick="toggleArchive()" class="text-xl"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="p-8 overflow-y-auto flex-1 max-w-3xl mx-auto w-full" id="archive-list"></div>
+    </div>
+
+    <!-- Modal 2: Morning Routine Detail and Tracking Modal -->
+    <div id="routine-modal" class="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden transition-opacity duration-300">
+        <div class="bg-panel border border-border w-full max-w-md rounded-xl shadow-2xl overflow-hidden transform scale-95 opacity-0 transition-all duration-300" id="routine-modal-panel">
+            <div class="p-6 border-b border-border flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-accent-ochre/10 rounded-lg text-accent-ochre">
+                        <i class="ph ph-sun-dim text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-serif italic text-xl text-stone-900">Morning Routine</h3>
+                        <p class="text-xs text-muted">A slow start for high focus</p>
+                    </div>
+                </div>
+                <button onclick="closeRoutineModal()" class="p-1 text-muted hover:text-stone-900 transition">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-muted leading-relaxed font-medium">
+                    Suggested window: <span class="text-stone-900 font-semibold">6:00 AM – 7:30 AM</span>. 
+                    Complete items at your own pace. Checking these off updates your daily completion score in real-time.
+                </p>
+
+                <!-- Interactive Sub-checklists -->
+                <div class="space-y-2.5" id="routine-interactive-checklist">
+                    <!-- Checklist injected here dynamically -->
+                </div>
+
+                <!-- Alternative Day Switcher (Vitamin C vs Niacinamide) -->
+                <div class="p-3 bg-canvas border border-border rounded-lg flex items-center justify-between shadow-sm">
+                    <div>
+                        <p class="text-xs font-semibold text-stone-900">Active Skincare Alternation</p>
+                        <p class="text-[10px] text-muted font-medium" id="skincare-alt-text">Today: Vitamin C (Even Day)</p>
+                    </div>
+                    <button onclick="toggleSkincareDay()" class="px-2.5 py-1 bg-panel text-xs rounded hover:bg-border transition text-sand hover:text-stone-900 border border-border shadow-sm">
+                        Switch Active
+                    </button>
+                </div>
+            </div>
+
+            <div class="bg-canvas px-6 py-4 flex justify-between items-center border-t border-border/50">
+                <div class="text-[11px] text-muted">
+                    Completed: <span id="routine-completion-percentage" class="text-accent-ochre font-bold">0%</span>
+                </div>
+                <button onclick="closeRoutineModal()" class="px-4 py-1.5 bg-accent-ochre text-white rounded text-xs font-semibold hover:opacity-95 transition shadow-sm">
+                    Save & Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 3: Budget Reallocator (The Sliders) -->
+    <div id="budget-modal" class="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden">
+        <div class="bg-panel border border-border w-full max-w-lg rounded-xl shadow-2xl overflow-hidden">
+            <div class="p-6 border-b border-border flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-accent-sage/10 rounded-lg text-accent-sage">
+                        <i class="ph ph-chart-pie-slice text-2xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-serif italic text-xl text-stone-900">Rebalance Day Budget</h3>
+                        <p class="text-xs text-muted">Distribute your 24-hour cycle to prevent burnout</p>
+                    </div>
+                </div>
+                <button onclick="closeCustomizerModal()" class="p-1 text-muted hover:text-stone-900 transition">
+                    <i class="ph ph-x text-lg"></i>
+                </button>
+            </div>
+
+            <div class="p-6 space-y-4 max-h-[400px] overflow-y-auto" id="budget-sliders-container">
+                <!-- Dynamic Sliders Rendered Here -->
+            </div>
+
+            <div class="bg-canvas px-6 py-4 flex justify-between items-center border-t border-border/50">
+                <div class="text-[11px] text-muted">
+                    Total Allocated: <span id="budget-total-indicator" class="font-semibold text-stone-900">24h / 24h</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="resetBudgetDefaults()" class="px-3 py-1.5 bg-canvas hover:bg-panel text-xs rounded border border-border text-stone-800 transition font-semibold shadow-sm">Reset Defaults</button>
+                    <button onclick="saveAndApplyBudget()" id="save-budget-btn" class="px-4 py-1.5 bg-accent-sage text-white rounded text-xs font-semibold hover:opacity-95 transition shadow-sm">Apply Rhythm</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Application Script Block -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+
+        // Bind global window functions for HTML click handlers
+        window.switchView = switchView;
+        window.toggleArchive = toggleArchive;
+        window.toggleSection = toggleSection;
+        window.shiftDate = shiftDate;
+        window.addCustomBucket = addCustomBucket;
+        window.handleNewBucketKeyPress = handleNewBucketKeyPress;
+        window.cancelNewBucket = cancelNewBucket;
+        window.updateBucketTitle = updateBucketTitle;
+        window.deleteBucket = deleteBucket;
+        window.dragOverBoard = dragOverBoard;
+        window.dragLeaveBoard = dragLeaveBoard;
+        window.dropBoard = dropBoard;
+        window.handleNewTask = handleNewTask;
+        window.drag = drag;
+        window.dragEnd = dragEnd;
+        window.updateTaskText = updateTaskText;
+        window.handleTaskEditKeydown = handleTaskEditKeydown;
+        window.completeTask = completeTask;
+        window.restoreTask = restoreTask;
+        window.deleteTask = deleteTask;
+        window.dragBucketStart = dragBucketStart;
+        window.dragBucketOver = dragBucketOver;
+        window.dragBucketDrop = dragBucketDrop;
+        window.dragBucketEnd = dragBucketEnd;
+
+        // Timetable Grid Specific Bindings
+        window.changeWeek = changeWeek;
+        window.goToToday = goToToday;
+        window.openRoutineModal = openRoutineModal;
+        window.closeRoutineModal = closeRoutineModal;
+        window.openCustomizerModal = openCustomizerModal;
+        window.closeCustomizerModal = closeCustomizerModal;
+        window.saveAndApplyBudget = saveAndApplyBudget;
+        window.resetBudgetDefaults = resetBudgetDefaults;
+        window.resetBudgetDefaultsAndRefresh = resetBudgetDefaultsAndRefresh;
+        window.toggleSkincareDay = toggleSkincareDay;
+        window.toggleZenItem = toggleZenItem;
+        window.toggleStartupTask = toggleStartupTask;
+        window.addStartupTask = addStartupTask;
+        window.deleteStartupTask = deleteStartupTask;
+        window.updateSliderDisplay = updateSliderDisplay;
+
+        window.draggedTaskDOM = null;
+        window.draggedBucketDOM = null;
+
+        const backupFirebaseConfig = {
+            apiKey: "AIzaSyDVHbinwIHJSywslHkNacI85soMsTYcL5s",
+            authDomain: "flow-2026-1c372.firebaseapp.com",
+            projectId: "flow-2026-1c372",
+            storageBucket: "flow-2026-1c372.firebasestorage.app",
+            messagingSenderId: "979216051731",
+            appId: "1:979216051731:web:5676c5745c7b68974b99e6",
+            measurementId: "G-3YQ9ERDPKL"
+        };
+
+        const firebaseConfig = (typeof __firebase_config !== 'undefined')
+            ? JSON.parse(__firebase_config)
+            : backupFirebaseConfig;
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        let currentUser = null;
+        let tasks = [];
+        let customBuckets = [];
+        let dateOffset = 0;
+
+        // Hardcode restored account UID directly so tasks pull instantly!
+        const TARGET_UID = "uylt0NsWhJdWeljT6yui0cMkLAr1";
+
+        const initialToday = new Date();
+        const isWorkspace = (typeof __app_id !== 'undefined') || window.location.hostname.includes('usercontent.goog');
+
+        const getTasksCol = () => {
+            if (isWorkspace && currentUser) {
+                return collection(db, 'artifacts', appId, 'users', currentUser.uid, 'tasks');
+            }
+            return collection(db, 'users', TARGET_UID, 'tasks');
+        };
+
+        const getBucketsCol = () => {
+            if (isWorkspace && currentUser) {
+                return collection(db, 'artifacts', appId, 'users', currentUser.uid, 'customBuckets');
+            }
+            return collection(db, 'users', TARGET_UID, 'customBuckets');
+        };
+
+        const getScheduleDoc = () => {
+            if (isWorkspace && currentUser) {
+                return doc(db, 'artifacts', appId, 'users', currentUser.uid, 'schedule', 'state');
+            }
+            return doc(db, 'users', TARGET_UID, 'schedule', 'state');
+        };
+
+        // Switch View Tab Function
+        function switchView(viewName) {
+            if (viewName === 'board') {
+                document.getElementById('board-view-container').classList.remove('hidden');
+                document.getElementById('schedule-view-container').classList.add('hidden');
+                
+                document.getElementById('tab-board').className = "px-3 py-1 rounded font-semibold bg-white text-charcoal shadow-sm transition-all duration-200";
+                document.getElementById('tab-schedule').className = "px-3 py-1 rounded font-medium text-gray-300 hover:text-white transition-all duration-200";
+                document.body.style.backgroundColor = '#FDFDFC'; // Cream
+            } else {
+                document.getElementById('board-view-container').classList.add('hidden');
+                document.getElementById('schedule-view-container').classList.remove('hidden');
+                
+                document.getElementById('tab-board').className = "px-3 py-1 rounded font-medium text-gray-300 hover:text-white transition-all duration-200";
+                document.getElementById('tab-schedule').className = "px-3 py-1 rounded font-semibold bg-white text-charcoal shadow-sm transition-all duration-200";
+                document.body.style.backgroundColor = '#fdfbfa'; // Canvas
+            }
+        }
+
+        // ==========================================
+        // Timetable / Intention Grid State & Logic
+        // ==========================================
+        const START_DATE = new Date(2026, 5, 16); // June 16, 2026
+        let selectedDate = new Date(2026, 5, 16); // Track viewing window date
+        let currentView = 'week'; // 'week' or 'day'
+
+        // Core Timetable Bucket Allocations (Summing up to exactly 24 hours)
+        let buckets = {
+            sleep: { name: "Sleep (6h)", hours: 6.0, color: "accent-charcoal", bgClass: "bg-accent-charcoal/20", borderClass: "border-accent-charcoal", hex: "#4a433b", description: "Essential recovery block" },
+            morning: { name: "Morning Ritual", hours: 1.5, color: "accent-ochre", bgClass: "bg-accent-ochre/20", borderClass: "border-accent-ochre", hex: "#a87834", description: "Water, mild exercise, skincare, breakfast" },
+            work: { name: "Internship & Research", hours: 6.0, color: "accent-sage", bgClass: "bg-accent-sage/20", borderClass: "border-accent-sage", hex: "#5c6e4f", description: "Deep focus execution and research blocks" },
+            gym: { name: "Gym & Commute", hours: 1.5, color: "accent-terracotta", bgClass: "bg-accent-terracotta/20", borderClass: "border-accent-terracotta", hex: "#bd5338", description: "Strength, movement, travel" },
+            cooking: { name: "Kitchen Prep & Cooking", hours: 2.0, color: "accent-ochre", bgClass: "bg-accent-ochre/20", borderClass: "border-accent-ochre", hex: "#a87834", description: "Meal cook, kitchen maintenance" },
+            lunch_dinner: { name: "Lunch & Dinner Eats", hours: 1.0, color: "accent-ochre", bgClass: "bg-accent-ochre/15", borderClass: "border-accent-ochre", hex: "#8c6023", description: "Intentional eating without screens" },
+            career: { name: "Career Acceleration", hours: 1.0, color: "accent-sand", bgClass: "bg-accent-sand/20", borderClass: "border-accent-sand", hex: "#2b241e", description: "Coffee chats, vocabs, resumes, apps" },
+            build: { name: "Own Startup", hours: 2.0, color: "accent-terracotta", bgClass: "bg-accent-terracotta/20", borderClass: "border-accent-terracotta", hex: "#bd5338", description: "Building product features, customer outreach, & roadmap deployment" },
+            learning: { name: "Technical L&D", hours: 1.0, color: "accent-sage", bgClass: "bg-accent-sage/20", borderClass: "border-accent-sage", hex: "#46573e", description: "Computer science theory, architectures" },
+            portfolio: { name: "Portfolio & Writing", hours: 1.0, color: "accent-sand", bgClass: "bg-accent-sand/15", borderClass: "border-accent-sand", hex: "#42382f", description: "LinkedIn updates, personal site tweaks" },
+            pmprep: { name: "PM Theory & Case", hours: 1.0, color: "accent-clay", bgClass: "bg-accent-clay/25", borderClass: "accent-clay", hex: "#736253", description: "Case books, product design metrics" },
+            misc: { name: "Miscellaneous Margin", hours: 1.0, color: "accent-clay", bgClass: "bg-accent-clay/15", borderClass: "border-accent-clay", hex: "#5c4f43", description: "Admin, emails, life logistics" }
+        };
+
+        // Morning Routine Detailed Checklist & Persistence Map
+        let checklistDatabase = {};
+
+        const defaultMorningItems = [
+            { id: "water", label: "Drink big glass of water", done: true },
+            { id: "exercise", label: "Mild exercise with music on", done: false },
+            { id: "bath", label: "Bath (body wash & leave-in conditioner)", done: false },
+            { id: "skincare_moisture", label: "Skincare: Moisturizer w/ Niacinamide", done: false },
+            { id: "skincare_alt", label: "Skincare: Active Serum (Alternate days)", done: false },
+            { id: "sunscreen", label: "Apply daily sunscreen", done: false },
+            { id: "breakfast", label: "Cook & have clean breakfast", done: false }
+        ];
+
+        let alternateSkincareDay = "Vitamin C (Even Day)";
+
+        // Startup checklists State Management
+        let startupTasks = [
+            { id: "st-1", label: "Define MVP scope & core value prop", done: true },
+            { id: "st-2", label: "Mockup landing page copy & layout", done: false },
+            { id: "st-3", label: "Setup deployment pipeline & database", done: false },
+            { id: "st-4", label: "Map out user onboarding flows", done: false }
+        ];
+
+        // Daily Schedule Template Block layout (with renamed 'build' block -> 'own startup')
+        const dailyScheduleTemplate = [
+            { id: "sleep-block", bucket: "sleep", startHour: 0.0, endHour: 6.0, name: "Deep Sleep & Recovery" },
+            { id: "morning-routine-block", bucket: "morning", startHour: 6.0, endHour: 7.5, name: "Morning Routine" },
+            { id: "work-block-1", bucket: "work", startHour: 8.0, endHour: 11.0, name: "Internship & Research: Core Depth" },
+            { id: "lunch-block", bucket: "lunch_dinner", startHour: 11.5, endHour: 12.0, name: "Mindful Lunch" },
+            { id: "work-block-2", bucket: "work", startHour: 12.0, endHour: 15.0, name: "Internship & Research: Project Execution" },
+            { id: "misc-block", bucket: "misc", startHour: 15.0, endHour: 16.0, name: "Email Chores & Margin" },
+            { id: "gym-block", bucket: "gym", startHour: 16.0, endHour: 17.5, name: "Movement: Gym & Commute" },
+            { id: "cook-dinner-block", bucket: "cooking", startHour: 17.5, endHour: 19.5, name: "Kitchen Prep & Cooking" },
+            { id: "eat-dinner-block", bucket: "lunch_dinner", startHour: 19.5, endHour: 20.0, name: "Dinner Window" },
+            { id: "career-block", bucket: "career", startHour: 20.0, endHour: 21.0, name: "Career Work: Reachout & Resume" },
+            { id: "build-block", bucket: "build", startHour: 21.0, endHour: 23.0, name: "Own Startup: MVP Code & Design" },
+            { id: "learning-block", bucket: "learning", startHour: 23.0, endHour: 24.0, name: "Technical L&D (CS/Systems)" }
+        ];
+
+        // Sync local schedule variables to Firestore
+        function saveScheduleDB() {
+            if (currentUser || !isWorkspace) {
+                setDoc(getScheduleDoc(), {
+                    buckets,
+                    startupTasks,
+                    checklistDatabase
+                }).catch(err => console.error("Firestore write error (schedule):", err));
+            }
+        }
+
+        // ==========================================
+        // Baseline Layout Rendering (Kanban & Grid)
+        // ==========================================
+        function renderSkeletalLayout() {
+            // Kanban elements
+            renderFocusBoard();
+            renderTimelineBoards();
+            renderCustomBoards();
+
+            // Schedule elements
+            buildHourHeaders();
+            buildHourBackgrounds();
+            renderSidebarBuckets();
+            updateTimeIndicator();
+            renderView();
+            renderStartupTasks();
+            updateZenFocusWidget();
+        }
+        renderSkeletalLayout();
+
+        async function initAuth() {
+            console.log("Initializing Auth...");
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                console.log("Attempting sign in with custom token...");
+                await signInWithCustomToken(auth, __initial_auth_token).catch((err) => {
+                    console.error("Custom token sign in failed, falling back to anonymous:", err);
+                    return signInAnonymously(auth);
+                });
+            } else {
+                console.log("Signing in anonymously...");
+                await signInAnonymously(auth).catch((err) => {
+                    console.error("Anonymous sign in failed:", err);
+                });
+            }
+        }
+        initAuth();
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            console.log("Auth state changed. User UID:", user ? user.uid : "null");
+            if (user) {
+                setupListeners();
+            } else {
+                if (window.bucketsUnsubscribe) window.bucketsUnsubscribe();
+                if (window.tasksUnsubscribe) window.tasksUnsubscribe();
+                if (window.scheduleUnsubscribe) window.scheduleUnsubscribe();
+            }
+        });
+
+        function setupListeners() {
+            const bucketsCol = getBucketsCol();
+            const tasksCol = getTasksCol();
+            const scheduleDoc = getScheduleDoc();
+            console.log("Setting up Firestore listeners...");
+
+            if (window.bucketsUnsubscribe) window.bucketsUnsubscribe();
+            if (window.tasksUnsubscribe) window.tasksUnsubscribe();
+            if (window.scheduleUnsubscribe) window.scheduleUnsubscribe();
+
+            window.bucketsUnsubscribe = onSnapshot(bucketsCol, (snap) => {
+                customBuckets = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0));
+                renderCustomBoards();
+                renderAllTasks();
+                showSyncIndicator();
+            }, (err) => {
+                console.error("Firestore read error (customBuckets):", err);
+            });
+
+            window.tasksUnsubscribe = onSnapshot(tasksCol, (snap) => {
+                tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                renderAllTasks();
+                showSyncIndicator();
+            }, (err) => {
+                console.error("Firestore read error (tasks):", err);
+            });
+
+            // Schedule sync listener
+            window.scheduleUnsubscribe = onSnapshot(scheduleDoc, (snap) => {
+                if (snap.exists()) {
+                    console.log("Received schedule state Firestore snapshot update");
+                    const data = snap.data();
+                    if (data.buckets) buckets = data.buckets;
+                    if (data.startupTasks) startupTasks = data.startupTasks;
+                    if (data.checklistDatabase) checklistDatabase = data.checklistDatabase;
+                    
+                    renderSidebarBuckets();
+                    renderView();
+                    renderStartupTasks();
+                    updateZenFocusWidget();
+                    showSyncIndicator();
+                } else {
+                    console.log("No schedule state found in Firestore. Saving local defaults...");
+                    saveScheduleDB();
+                }
+            }, (err) => {
+                console.error("Firestore read error (scheduleDoc):", err);
+            });
+        }
+
+        function renderAllTasks() {
+            ['focus', ...getTimelineStructure().map(c => c.id), ...customBuckets.map(b => b.id)].forEach(renderTasksForBucket);
+        }
+
+        // ==========================================
+        // To-Do Dashboard Kanban Render Functions
+        // ==========================================
+        function renderFocusBoard() {
+            const container = document.getElementById('focus-boards');
+            if (!container) return;
+            container.innerHTML = createBoardHTML('focus', 'Immediate');
+        }
+
+        function renderTimelineBoards() {
+            const container = document.getElementById('timeline-boards');
+            if (!container) return;
+            container.innerHTML = getTimelineStructure().map(col => createBoardHTML(col.id, col.title)).join('');
+        }
+
+        function renderCustomBoards() {
+            const container = document.getElementById('custom-boards');
+            if (!container) return;
+            container.innerHTML = customBuckets.map(b => createBoardHTML(b.id, b.title, true)).join('') + `
+                <div id="new-bucket-container" class="hidden min-w-[280px] w-[280px] pt-1">
+                    <input type="text" id="new-bucket-input" placeholder="Name space..." class="w-full text-sm border-b border-dashed outline-none" onkeypress="handleNewBucketKeyPress(event)" onblur="cancelNewBucket()">
+                </div>
+            `;
+        }
+
+        function createBoardHTML(id, title, isCustom = false) {
+            return `
+                <div class="flex flex-col min-w-[280px] w-[280px] board-container group/board" data-bucket="${id}"
+                     ${isCustom ? `draggable="true" ondragstart="dragBucketStart(event, '${id}')" ondragend="dragBucketEnd(event)"` : ''}
+                     ondragover="if(window.draggedBucketDOM){dragBucketOver(event,'${id}')}else{dragOverBoard(event,'${id}')}"
+                     ondragleave="dragLeaveBoard(event, '${id}')"
+                     ondrop="if(window.draggedBucketDOM){dragBucketDrop(event,'${id}')}else{dropBoard(event,'${id}')}">
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="text-sm font-semibold flex-1" ${isCustom ? `contenteditable="true" onkeydown="handleTaskEditKeydown(event)" onblur="updateBucketTitle('${id}', this.innerText)"` : ''}>${title}</h3>
+                        ${isCustom ? `<button onclick="deleteBucket('${id}')" class="opacity-0 group-hover/board:opacity-100 text-gray-300 hover:text-red-400"><i class="fa-solid fa-trash text-[10px]"></i></button>` : ''}
+                    </div>
+                    <div class="board-column flex flex-col gap-1.5" id="board-${id}"></div>
+                    <input type="text" placeholder="Add task..." class="add-task-input mt-2" onkeypress="handleNewTask(event, '${id}')">
+                </div>
+            `;
+        }
+
+        function renderTasksForBucket(id) {
+            const board = document.getElementById(`board-${id}`);
+            if (!board) return;
+            const sortedTasks = tasks
+                .filter(t => t.bucketId === id && t.status === 'active')
+                .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+            board.innerHTML = sortedTasks.map(t => createTaskHTML(t)).join('');
+        }
+
+        function createTaskHTML(task) {
+            return `<div class="task-card group p-2 bg-[#ffffff] border border-black/5 hover:border-black/10 transition-all mb-1" draggable="true" id="${task.id}" ondragstart="drag(event)" ondragend="dragEnd(event)">
+                <div class="editable-text pr-6 text-stone-800" contenteditable="true" onkeydown="handleTaskEditKeydown(event)" onblur="updateTaskText('${task.id}', this.innerText)">${task.text}</div>
+                <div class="task-checkbox-wrapper opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onclick="completeTask('${task.id}')" class="task-checkbox"><div class="task-checkbox-inner"></div></button>
+                </div>
+            </div>`;
+        }
+
+        // ==========================================
+        // Kanban Drag-and-Drop Handlers
+        // ==========================================
+        function dragBucketStart(ev, id) {
+            ev.stopPropagation();
+            window.draggedBucketDOM = ev.currentTarget;
+            setTimeout(() => window.draggedBucketDOM.classList.add('opacity-40'), 0);
+        }
+
+        function dragBucketOver(ev) {
+            ev.preventDefault();
+            if (!window.draggedBucketDOM) return;
+            const container = document.getElementById('custom-boards');
+            const after = getDragAfterBucket(container, ev.clientX);
+            const input = document.getElementById('new-bucket-container');
+            if (!after) container.insertBefore(window.draggedBucketDOM, input);
+            else if (window.draggedBucketDOM !== after) container.insertBefore(window.draggedBucketDOM, after);
+        }
+
+        function dragBucketDrop(ev) { ev.preventDefault(); }
+
+        function dragBucketEnd() {
+            if (window.draggedBucketDOM) window.draggedBucketDOM.classList.remove('opacity-40');
+            window.draggedBucketDOM = null;
+            const boards = document.getElementById('custom-boards').querySelectorAll('.board-container[data-bucket]');
+            boards.forEach((b, i) => {
+                const bucketId = b.getAttribute('data-bucket');
+                const bucket = customBuckets.find(cb => cb.id === bucketId);
+                if (bucket && bucket.order !== i) { bucket.order = i; saveBucketDB(bucket); }
+            });
+            customBuckets.sort((a, b) => (a.order || 0) - (b.order || 0));
+        }
+
+        function getDragAfterBucket(container, x) {
+            const draggables = [...container.querySelectorAll('.board-container:not(.opacity-40)')];
+            return draggables.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = x - (box.left + box.width / 2);
+                if (offset < 0 && offset > closest.offset) return { offset, element: child };
+                return closest;
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function drag(ev) {
+            ev.stopPropagation();
+            window.draggedTaskDOM = ev.target.closest('.task-card');
+            setTimeout(() => window.draggedTaskDOM.classList.add('dragging'), 0);
+        }
+
+        function dragEnd() {
+            if (window.draggedTaskDOM) window.draggedTaskDOM.classList.remove('dragging');
+            window.draggedTaskDOM = null;
+            document.querySelectorAll('.board-container').forEach(c => c.classList.remove('drag-over'));
+            syncTasks();
+        }
+
+        function dragOverBoard(ev, id) {
+            ev.preventDefault();
+            if (!window.draggedTaskDOM) return;
+            ev.currentTarget.classList.add('drag-over');
+            const col = document.getElementById(`board-${id}`);
+            const after = getDragAfterElement(col, ev.clientY);
+            if (!after) col.appendChild(window.draggedTaskDOM);
+            else col.insertBefore(window.draggedTaskDOM, after);
+        }
+
+        function dragLeaveBoard(ev) {
+            const container = ev.currentTarget;
+            if (container && !container.contains(ev.relatedTarget)) {
+                container.classList.remove('drag-over');
+            }
+        }
+
+        function dropBoard(ev) { ev.preventDefault(); }
+
+        function getDragAfterElement(container, y) {
+            const draggables = [...container.querySelectorAll('.task-card:not(.dragging)')];
+            return draggables.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - (box.top + box.height / 2);
+                if (offset < 0 && offset > closest.offset) return { offset, element: child };
+                return closest;
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function syncTasks() {
+            document.querySelectorAll('.board-column').forEach(col => {
+                const bId = col.id.replace('board-', '');
+                col.querySelectorAll('.task-card').forEach((card, idx) => {
+                    const t = tasks.find(x => x.id === card.id);
+                    if (t && (t.bucketId !== bId || t.order !== idx)) {
+                        t.bucketId = bId;
+                        t.order = idx;
+                        saveTaskDB(t);
+                    }
+                });
+            });
+        }
+
+        // ==========================================
+        // To-Do Dashboard Event Handlers
+        // ==========================================
+        function getTimelineStructure() {
+            const cols = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(initialToday);
+                d.setDate(d.getDate() + dateOffset + i);
+                cols.push({ id: `date-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`, title: d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' }) });
+            }
+            return cols;
+        }
+
+        function updateDateDisplay() {
+            document.getElementById('current-date-display').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        }
+        updateDateDisplay();
+
+        function toggleSection(id, icon) {
+            const el = document.getElementById(id);
+            const ic = document.getElementById(icon);
+            el.classList.toggle('hidden');
+            ic.classList.toggle('-rotate-90');
+        }
+
+        function saveTaskDB(t) {
+            if (currentUser || !isWorkspace) {
+                setDoc(doc(getTasksCol(), t.id), t);
+            }
+        }
+
+        function saveBucketDB(b) {
+            if (currentUser || !isWorkspace) {
+                setDoc(doc(getBucketsCol(), b.id), b);
+            }
+        }
+
+        function handleNewTask(ev, id) {
+            if (ev.key === 'Enter' && ev.target.value.trim()) {
+                const activeCount = tasks.filter(x => x.bucketId === id && x.status === 'active').length;
+                const t = { id: 't' + Date.now(), text: ev.target.value.trim(), bucketId: id, status: 'active', order: activeCount };
+                tasks.push(t);
+                renderTasksForBucket(id);
+                saveTaskDB(t);
+                ev.target.value = '';
+            }
+        }
+
+        function addCustomBucket() {
+            const input = document.getElementById('new-bucket-input');
+            input.parentElement.classList.remove('hidden');
+            input.focus();
+        }
+
+        function handleNewBucketKeyPress(ev) {
+            if (ev.key === 'Enter' && ev.target.value.trim()) {
+                const b = { id: 'b' + Date.now(), title: ev.target.value.trim(), order: customBuckets.length };
+                customBuckets.push(b);
+                renderCustomBoards();
+                renderAllTasks();
+                saveBucketDB(b);
+                cancelNewBucket();
+            }
+        }
+
+        function cancelNewBucket() {
+            const input = document.getElementById('new-bucket-input');
+            if (input) input.value = '';
+            document.getElementById('new-bucket-container').classList.add('hidden');
+        }
+
+        function updateBucketTitle(id, val) {
+            const b = customBuckets.find(x => x.id === id);
+            if (b && val.trim() && b.title !== val.trim()) { b.title = val.trim(); saveBucketDB(b); }
+        }
+
+        function deleteBucket(id) {
+            if (confirm("Delete space?")) {
+                const tasksToDelete = tasks.filter(t => t.bucketId === id);
+                customBuckets = customBuckets.filter(x => x.id !== id);
+                tasks = tasks.filter(t => t.bucketId !== id);
+                renderCustomBoards();
+                renderAllTasks();
+                if (currentUser || !isWorkspace) {
+                    deleteDoc(doc(getBucketsCol(), id));
+                    tasksToDelete.forEach(t => {
+                        deleteDoc(doc(getTasksCol(), t.id));
+                    });
+                }
+            }
+        }
+
+        function updateTaskText(id, txt) {
+            const t = tasks.find(x => x.id === id);
+            if (t && txt.trim() && t.text !== txt.trim()) { t.text = txt.trim(); saveTaskDB(t); }
+        }
+
+        function completeTask(id) {
+            const t = tasks.find(x => x.id === id);
+            if (t) {
+                t.status = 'archived';
+                renderAllTasks();
+                saveTaskDB(t);
+            }
+        }
+
+        function toggleArchive() { document.getElementById('archive-modal').classList.toggle('hidden'); renderArchive(); }
+
+        function renderArchive() {
+            const list = document.getElementById('archive-list');
+            list.innerHTML = tasks.filter(t => t.status === 'archived').map(t => `
+                <div class="p-2 border-b flex justify-between items-center text-stone-800">
+                    <span>${t.text}</span>
+                    <div class="flex gap-3">
+                        <button onclick="restoreTask('${t.id}')" class="text-xs text-blue-500 hover:underline">Restore</button>
+                        <button onclick="deleteTask('${t.id}')" class="text-xs text-red-500 hover:underline">Delete</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function restoreTask(id) {
+            const t = tasks.find(x => x.id === id);
+            if (t) {
+                const activeCount = tasks.filter(x => x.bucketId === 'focus' && x.status === 'active').length;
+                t.status = 'active';
+                t.bucketId = 'focus';
+                t.order = activeCount;
+                renderArchive();
+                renderAllTasks();
+                saveTaskDB(t);
+            }
+        }
+
+        function deleteTask(id) {
+            if (confirm("Permanently delete this task?")) {
+                tasks = tasks.filter(x => x.id !== id);
+                renderArchive();
+                renderAllTasks();
+                if (currentUser || !isWorkspace) {
+                    deleteDoc(doc(getTasksCol(), id));
+                }
+            }
+        }
+
+        function shiftDate(n) { dateOffset = (n === 0) ? 0 : dateOffset + n; renderTimelineBoards(); }
+
+        function showSyncIndicator() {
+            const el = document.getElementById('cloud-sync-indicator');
+            el.style.opacity = '1';
+            setTimeout(() => el.style.opacity = '0', 2000);
+        }
+
+        function handleTaskEditKeydown(ev) { if (ev.key === 'Enter') { ev.preventDefault(); ev.target.blur(); } }
+
+
+        // ==========================================
+        // Timetable Grid Specific Code & Logic
+        // ==========================================
+        function renderStartupTasks() {
+            const container = document.getElementById('startup-tasks-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const doneCount = startupTasks.filter(t => t.done).length;
+            document.getElementById('startup-count').textContent = `${doneCount}/${startupTasks.length} done`;
+
+            startupTasks.forEach(task => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between gap-2 p-2 bg-panel/35 rounded-lg border border-border/30 hover:border-border transition';
+                item.innerHTML = `
+                    <label class="flex items-center gap-2.5 text-xs text-sand/90 cursor-pointer flex-1 min-w-0 font-medium">
+                        <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleStartupTask('${task.id}')" class="rounded bg-canvas border-border text-accent-terracotta focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5 shrink-0">
+                        <span class="truncate ${task.done ? 'line-through text-muted font-normal' : 'text-stone-900'}">${task.label}</span>
+                    </label>
+                    <button onclick="deleteStartupTask('${task.id}')" class="text-muted hover:text-accent-terracotta transition text-xs shrink-0 px-1">
+                        <i class="ph ph-trash"></i>
+                    </button>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function toggleStartupTask(id) {
+            const task = startupTasks.find(t => t.id === id);
+            if (task) {
+                task.done = !task.done;
+                saveScheduleDB();
+            }
+            renderStartupTasks();
+        }
+
+        function addStartupTask() {
+            const input = document.getElementById('new-startup-task');
+            const label = input.value.trim();
+            if (!label) return;
+
+            const newTask = {
+                id: 'st-' + Date.now(),
+                label: label,
+                done: false
+            };
+            startupTasks.push(newTask);
+            input.value = '';
+            saveScheduleDB();
+            renderStartupTasks();
+        }
+
+        function deleteStartupTask(id) {
+            startupTasks = startupTasks.filter(t => t.id !== id);
+            saveScheduleDB();
+            renderStartupTasks();
+        }
+
+        // Generate horizontal hour headers
+        function buildHourHeaders() {
+            const container = document.getElementById('hour-header-grid');
+            if (!container) return;
+            container.innerHTML = '';
+
+            for (let h = 0; h < 24; h++) {
+                const label = document.createElement('div');
+                label.className = 'absolute text-[10px] text-muted font-mono pointer-events-none font-bold text-center border-l border-border/20 h-full flex items-center justify-center';
+                label.style.left = `${h * 80}px`;
+                label.style.width = '80px';
+
+                let displayHour = h;
+                let suffix = 'AM';
+                if (h === 0) {
+                    displayHour = 12;
+                } else if (h === 12) {
+                    suffix = 'PM';
+                } else if (h > 12) {
+                    displayHour = h - 12;
+                    suffix = 'PM';
+                }
+
+                label.textContent = `${displayHour} ${suffix}`;
+                container.appendChild(label);
+            }
+        }
+
+        // Generate vertical background hour gridlines
+        function buildHourBackgrounds() {
+            const bgContainer = document.getElementById('vertical-grid-lines');
+            if (!bgContainer) return;
+            bgContainer.innerHTML = '';
+            for (let h = 0; h < 24; h++) {
+                const line = document.createElement('div');
+                line.className = 'absolute top-0 bottom-0 border-l border-border/30 pointer-events-none';
+                line.style.left = `${h * 80}px`;
+
+                // Subtle shading for twilight/sleep hours
+                if (h < 6 || h >= 22) {
+                    const shade = document.createElement('div');
+                    shade.className = 'absolute top-0 bottom-0 bg-[#f3ede4]/40';
+                    shade.style.left = `${h * 80}px`;
+                    shade.style.width = '80px';
+                    bgContainer.appendChild(shade);
+                }
+                bgContainer.appendChild(line);
+            }
+        }
+
+        function renderSidebarBuckets() {
+            const container = document.getElementById('allocation-buckets-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            Object.entries(buckets).forEach(([key, value]) => {
+                const percentage = ((value.hours / 24) * 100).toFixed(0);
+
+                const item = document.createElement('div');
+                item.className = 'p-3 bg-canvas border border-border/80 rounded-xl flex items-center justify-between hover:border-muted/50 hover:shadow-sm transition duration-200 group';
+
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <span class="w-2.5 h-2.5 rounded-full" style="background-color: ${value.hex}"></span>
+                        <div>
+                            <p class="text-xs font-semibold text-stone-900 group-hover:text-accent-terracotta transition">${value.name}</p>
+                            <p class="text-[10px] text-muted line-clamp-1 font-medium">${value.description}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-xs font-mono font-bold text-stone-800">${value.hours} hr</p>
+                        <p class="text-[9px] text-muted font-semibold">${percentage}%</p>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        // Dynamic weekdays calendar boundaries generator (spanning until June 30, 2026)
+        function getWeekDays(startDate) {
+            const current = new Date(startDate);
+            const days = [];
+            for (let i = 0; i < 7; i++) {
+                days.push(new Date(current));
+                current.setDate(current.getDate() + 1);
+            }
+            return days;
+        }
+
+        function renderView() {
+            const weekDays = getWeekDays(selectedDate);
+            const rowsContainer = document.getElementById('day-rows-container');
+            if (!rowsContainer) return;
+
+            const lastDay = weekDays[6];
+            document.getElementById('current-date-range-display').textContent =
+                `${weekDays[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${lastDay.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+
+            rowsContainer.innerHTML = '';
+
+            // Restrict displays on Single Day viewport toggles
+            const targetDays = currentView === 'day' ? [new Date(selectedDate)] : weekDays;
+
+            targetDays.forEach((day) => {
+                const isToday = day.getFullYear() === 2026 && day.getMonth() === 5 && day.getDate() === 16;
+
+                // Generate horizontal row for the day
+                const rowEl = document.createElement('div');
+                rowEl.className = `relative w-full h-28 border-b border-border/60 flex items-center ${isToday ? 'bg-panel/20' : ''}`;
+
+                // Sticky Left Day Header Column
+                const dayHeaderCol = document.createElement('div');
+                dayHeaderCol.className = `absolute left-0 top-0 bottom-0 w-28 shrink-0 bg-panel/95 backdrop-blur-md z-20 border-r border-border flex flex-col items-center justify-center shadow-[4px_0_10px_-4px_rgba(0,0,0,0.05)]`;
+                dayHeaderCol.innerHTML = `
+                    <span class="text-[10px] uppercase tracking-wider ${isToday ? 'text-accent-terracotta font-bold' : 'text-muted font-semibold'}">${day.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+                    <span class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold mt-1 ${isToday ? 'bg-accent-terracotta text-white' : 'text-stone-900'}">
+                        ${day.getDate()}
+                    </span>
+                `;
+                rowEl.appendChild(dayHeaderCol);
+
+                // Timeline container (offset from sticky Day header)
+                const scheduleTimeline = document.createElement('div');
+                scheduleTimeline.className = 'absolute left-28 right-0 top-0 bottom-0 h-full';
+
+                // Render schedule blocks horizontally inside row
+                dailyScheduleTemplate.forEach((block) => {
+                    const durationHours = block.endHour - block.startHour;
+                    const meta = buckets[block.bucket];
+
+                    const blockEl = document.createElement('div');
+                    blockEl.className = 'absolute top-2 bottom-2 rounded-lg p-2.5 flex flex-col justify-between border select-none cursor-pointer overflow-hidden transition-all duration-300 group hover:-translate-y-0.5 hover:shadow-md hover:z-30 shadow-sm';
+
+                    // Align horizontally based on hour width parameter (80px)
+                    blockEl.style.left = `${block.startHour * 80 + 4}px`;
+                    blockEl.style.width = `${durationHours * 80 - 6}px`;
+                    blockEl.style.backgroundColor = `${meta.hex}18`;
+                    blockEl.style.borderColor = `${meta.hex}45`;
+
+                    blockEl.onclick = () => {
+                        if (block.bucket === 'morning') {
+                            openRoutineModal(day);
+                        } else {
+                            showGenericBlockDetails(block, day);
+                        }
+                    };
+
+                    const formattedStart = formatHour(block.startHour);
+                    const formattedEnd = formatHour(block.endHour);
+
+                    let completionIndicator = '';
+                    if (block.bucket === 'morning') {
+                        const dateStr = day.toISOString().split('T')[0];
+                        const items = checklistDatabase[dateStr] || defaultMorningItems;
+                        const doneCount = items.filter(i => i.done).length;
+                        const totalCount = items.length;
+                        const percent = Math.round((doneCount / totalCount) * 100);
+
+                        completionIndicator = `
+                            <div class="mt-0.5 flex items-center gap-1 text-[9px] text-accent-ochre font-bold">
+                                <i class="ph ph-check-circle-bold text-xs"></i>
+                                <span>${percent}% done</span>
+                            </div>
+                        `;
+                    }
+
+                    blockEl.innerHTML = `
+                        <div class="flex-1 overflow-hidden">
+                            <div class="flex items-center justify-between gap-1 mb-0.5">
+                                <span class="text-[9px] font-mono tracking-tight text-muted group-hover:text-stone-900 transition font-bold whitespace-nowrap">${formattedStart} - ${formattedEnd}</span>
+                            </div>
+                            <h4 class="text-xs font-serif font-bold text-stone-900 group-hover:text-accent-terracotta transition leading-tight truncate">${block.name}</h4>
+                            ${completionIndicator}
+                        </div>
+                    `;
+                    scheduleTimeline.appendChild(blockEl);
+                });
+
+                rowEl.appendChild(scheduleTimeline);
+                rowsContainer.appendChild(rowEl);
+            });
+        }
+
+        function formatHour(h) {
+            let displayHour = Math.floor(h);
+            const mins = Math.round((h % 1) * 60);
+            const suffix = displayHour >= 12 ? 'PM' : 'AM';
+
+            if (displayHour === 0) displayHour = 12;
+            if (displayHour > 12) displayHour = displayHour - 12;
+
+            return `${displayHour}:${mins.toString().padStart(2, '0')}${suffix}`;
+        }
+
+        // Calculates horizontal live marker scanning across timeline
+        function updateTimeIndicator() {
+            const indicator = document.getElementById('current-time-marker');
+            if (!indicator) return;
+            const now = new Date();
+
+            const currentHours = now.getHours();
+            const currentMins = now.getMinutes();
+            const totalFloatHour = currentHours + (currentMins / 60);
+
+            const xCoord = 112 + (totalFloatHour * 80); // Day header width = 112px, hourly slot width = 80px
+            indicator.style.left = `${xCoord}px`;
+
+            const weekDays = getWeekDays(selectedDate);
+            let activeDayIndex = -1;
+
+            weekDays.forEach((day, index) => {
+                if (day.getFullYear() === 2026 && day.getMonth() === 5 && day.getDate() === 16) {
+                    activeDayIndex = index; // Match simulation
+                }
+            });
+
+            // Show live timeline bar only when view encompasses the simulated day (June 16, 2026)
+            if (activeDayIndex !== -1) {
+                indicator.style.display = 'flex';
+            } else {
+                indicator.style.display = 'none';
+            }
+        }
+
+        function updateZenFocusWidget() {
+            const now = new Date();
+            const floatHour = now.getHours() + (now.getMinutes() / 60);
+
+            let activeBlock = dailyScheduleTemplate.find(b => floatHour >= b.startHour && floatHour < b.endHour);
+            if (!activeBlock) {
+                activeBlock = dailyScheduleTemplate[0]; // fallback Sleep
+            }
+
+            const bucketMeta = buckets[activeBlock.bucket];
+
+            const activeNameEl = document.getElementById('zen-activity-name');
+            const timeBadgeEl = document.getElementById('zen-time-badge');
+            const subtextEl = document.getElementById('zen-subtext');
+            const progressBarEl = document.getElementById('zen-progress-bar');
+            
+            if (activeNameEl) activeNameEl.textContent = activeBlock.name;
+            if (timeBadgeEl) timeBadgeEl.textContent = `${formatHour(activeBlock.startHour)} - ${formatHour(activeBlock.endHour)}`;
+            if (subtextEl) subtextEl.textContent = bucketMeta.description;
+
+            const totalDuration = activeBlock.endHour - activeBlock.startHour;
+            const elapsed = floatHour - activeBlock.startHour;
+            const percent = Math.min(100, Math.max(0, (elapsed / totalDuration) * 100));
+
+            if (progressBarEl) {
+                progressBarEl.style.width = `${percent}%`;
+                progressBarEl.style.backgroundColor = bucketMeta.hex;
+            }
+
+            const minsElapsed = Math.round(elapsed * 60);
+            const minsLeft = Math.round((totalDuration - elapsed) * 60);
+
+            const timerElapsedEl = document.getElementById('zen-timer-elapsed');
+            const timerRemainingEl = document.getElementById('zen-timer-remaining');
+
+            if (timerElapsedEl) timerElapsedEl.textContent = `${minsElapsed}m elapsed`;
+            if (timerRemainingEl) timerRemainingEl.textContent = `${minsLeft}m left`;
+
+            const zenChecklistContainer = document.getElementById('zen-checklist');
+            if (!zenChecklistContainer) return;
+
+            if (activeBlock.bucket === 'morning') {
+                const todayStr = new Date(2026, 5, 16).toISOString().split('T')[0];
+                const items = checklistDatabase[todayStr] || defaultMorningItems;
+
+                zenChecklistContainer.innerHTML = items.slice(0, 3).map(item => `
+                    <label class="flex items-center gap-2.5 text-xs text-sand/90 cursor-pointer hover:text-stone-900 transition py-0.5 font-medium">
+                        <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleZenItem('${item.id}')" class="rounded bg-canvas border-border text-accent-ochre focus:ring-0 focus:ring-offset-0 w-3.5 h-3.5">
+                        <span class="${item.done ? 'line-through text-muted' : 'text-stone-900'}">${item.label}</span>
+                    </label>
+                `).join('');
+            } else {
+                zenChecklistContainer.innerHTML = `
+                    <div class="flex items-center gap-2.5 text-xs text-muted font-medium">
+                        <i class="ph ph-circle-dashed animate-spin text-sm"></i>
+                        <span>Primary focus on designated flow state</span>
+                    </div>
+                `;
+            }
+        }
+
+        function toggleZenItem(itemId) {
+            const todayStr = new Date(2026, 5, 16).toISOString().split('T')[0];
+            if (!checklistDatabase[todayStr]) {
+                checklistDatabase[todayStr] = JSON.parse(JSON.stringify(defaultMorningItems));
+            }
+
+            const item = checklistDatabase[todayStr].find(i => i.id === itemId);
+            if (item) {
+                item.done = !item.done;
+                saveScheduleDB();
+            }
+
+            renderView();
+            updateZenFocusWidget();
+        }
+
+        function initializeChecklistsForCurrentWeek() {
+            const weekDays = getWeekDays(selectedDate);
+            weekDays.forEach(day => {
+                const str = day.toISOString().split('T')[0];
+                if (!checklistDatabase[str]) {
+                    checklistDatabase[str] = JSON.parse(JSON.stringify(defaultMorningItems));
+                }
+            });
+        }
+
+        let activeModalDate = null;
+
+        function openRoutineModal(day = new Date()) {
+            activeModalDate = day;
+            const dateStr = day.toISOString().split('T')[0];
+
+            if (!checklistDatabase[dateStr]) {
+                checklistDatabase[dateStr] = JSON.parse(JSON.stringify(defaultMorningItems));
+            }
+
+            const items = checklistDatabase[dateStr];
+            const listContainer = document.getElementById('routine-interactive-checklist');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            items.forEach((item) => {
+                const checkWrapper = document.createElement('div');
+                checkWrapper.className = `p-3 rounded-lg border flex items-center gap-3 transition cursor-pointer select-none shadow-sm ${item.done
+                    ? 'bg-accent-ochre/5 border-accent-ochre/25 text-muted'
+                    : 'bg-canvas border-border text-sand hover:border-accent-ochre/45'
+                    }`;
+
+                checkWrapper.innerHTML = `
+                    <div class="flex items-center justify-center">
+                        <input type="checkbox" id="modal-chk-${item.id}" ${item.done ? 'checked' : ''} class="hidden">
+                        <div class="w-5 h-5 rounded-full border flex items-center justify-center transition ${item.done ? 'bg-accent-ochre border-accent-ochre text-white' : 'border-muted'}">
+                            ${item.done ? '<i class="ph ph-check text-xs"></i>' : ''}
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold ${item.done ? 'line-through text-muted/80' : 'text-stone-900'}">${item.label}</p>
+                    </div>
+                `;
+
+                checkWrapper.onclick = () => {
+                    item.done = !item.done;
+                    saveScheduleDB();
+                    openRoutineModal(day);
+                };
+
+                listContainer.appendChild(checkWrapper);
+            });
+
+            const doneCount = items.filter(i => i.done).length;
+            const percent = Math.round((doneCount / items.length) * 100);
+            document.getElementById('routine-completion-percentage').textContent = `${percent}%`;
+
+            // Check date value for skincare day alternation
+            const dayNum = day.getDate();
+            alternateSkincareDay = (dayNum % 2 === 0)
+                ? "Vitamin C Serum (Even Day Active)"
+                : "Niacinamide / Retinol Alternate (Odd Day Active)";
+            document.getElementById('skincare-alt-text').textContent = `Today is June ${dayNum}: ${alternateSkincareDay}`;
+
+            const modal = document.getElementById('routine-modal');
+            const modalPanel = document.getElementById('routine-modal-panel');
+            modal.classList.remove('hidden');
+            setTimeout(() => {
+                modalPanel.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function toggleSkincareDay() {
+            const currentText = document.getElementById('skincare-alt-text').textContent;
+            if (currentText.includes("Vitamin C")) {
+                alternateSkincareDay = "Niacinamide Alternate overridden";
+            } else {
+                alternateSkincareDay = "Vitamin C Serum overridden";
+            }
+            document.getElementById('skincare-alt-text').textContent = alternateSkincareDay;
+        }
+
+        function closeRoutineModal() {
+            const modal = document.getElementById('routine-modal');
+            const modalPanel = document.getElementById('routine-modal-panel');
+
+            modalPanel.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                renderView();
+                updateZenFocusWidget();
+            }, 300);
+        }
+
+        // Informative popup alerts for non-checklist standard items
+        function showGenericBlockDetails(block, day) {
+            const meta = buckets[block.bucket];
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-6 right-6 bg-panel border border-border p-4 rounded-xl shadow-2xl z-50 flex flex-col gap-2 max-w-sm transition-all duration-300 transform translate-y-0 opacity-100';
+            toast.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full" style="background-color: ${meta.hex}"></span>
+                        <h4 class="font-serif italic text-stone-900 font-bold">${block.name}</h4>
+                    </div>
+                    <button class="text-xs text-muted hover:text-stone-900" onclick="this.parentElement.parentElement.remove()"><i class="ph ph-x"></i></button>
+                </div>
+                <p class="text-xs text-muted font-medium">${meta.description}</p>
+                <div class="text-[10px] text-stone-600 bg-canvas px-2.5 py-1 rounded border border-border/60 self-start font-bold mt-1">
+                    Scheduled on ${day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                </div>
+                <div class="text-[10px] text-muted self-end font-mono">
+                    <span class="text-stone-950">${formatHour(block.startHour)} - ${formatHour(block.endHour)}</span>
+                </div>
+            `;
+            document.body.appendChild(toast);
+            setTimeout(() => {
+                if (toast.parentElement) toast.remove();
+            }, 4000);
+        }
+
+        function openCustomizerModal() {
+            const container = document.getElementById('budget-sliders-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            Object.entries(buckets).forEach(([key, value]) => {
+                const sliderWrapper = document.createElement('div');
+                sliderWrapper.className = 'p-3 bg-canvas/40 border border-border rounded-lg space-y-2';
+                sliderWrapper.innerHTML = `
+                    <div class="flex justify-between items-center text-xs">
+                        <span class="font-semibold text-stone-900">${value.name}</span>
+                        <span class="font-mono text-accent-ochre font-bold" id="slider-val-${key}">${value.hours} hours</span>
+                    </div>
+                    <input type="range" min="0" max="12" step="0.5" value="${value.hours}" 
+                        oninput="updateSliderDisplay('${key}', this.value)" 
+                        class="w-full h-1 bg-border rounded-lg appearance-none cursor-pointer accent-accent-ochre">
+                `;
+                container.appendChild(sliderWrapper);
+            });
+
+            calculateBudgetTotalSum();
+            document.getElementById('budget-modal').classList.remove('hidden');
+        }
+
+        function updateSliderDisplay(key, val) {
+            document.getElementById(`slider-val-${key}`).textContent = `${parseFloat(val).toFixed(1)} hours`;
+            calculateBudgetTotalSum();
+        }
+
+        function calculateBudgetTotalSum() {
+            const sliders = document.querySelectorAll('#budget-sliders-container input[type="range"]');
+            let total = 0;
+            sliders.forEach(slider => {
+                total += parseFloat(slider.value);
+            });
+
+            const display = document.getElementById('budget-total-indicator');
+            if (display) display.textContent = `${total.toFixed(1)}h / 24h`;
+
+            const saveBtn = document.getElementById('save-budget-btn');
+            if (saveBtn && display) {
+                if (total !== 24.0) {
+                    display.classList.add('text-accent-terracotta');
+                    display.classList.remove('text-accent-sage');
+                    saveBtn.disabled = true;
+                    saveBtn.classList.add('opacity-40', 'cursor-not-allowed');
+                } else {
+                    display.classList.add('text-accent-sage');
+                    display.classList.remove('text-accent-terracotta');
+                    saveBtn.disabled = false;
+                    saveBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+                }
+            }
+        }
+
+        function saveAndApplyBudget() {
+            const sliders = document.querySelectorAll('#budget-sliders-container input[type="range"]');
+
+            Object.keys(buckets).forEach((key, idx) => {
+                const val = parseFloat(sliders[idx].value);
+                buckets[key].hours = val;
+            });
+
+            rebuildDailyTimelineFromBudget();
+            saveScheduleDB();
+
+            closeCustomizerModal();
+            renderSidebarBuckets();
+            renderView();
+            updateZenFocusWidget();
+        }
+
+        // Proportional reallocator logic
+        function rebuildDailyTimelineFromBudget() {
+            let startCursor = 0.0;
+
+            dailyScheduleTemplate.forEach(block => {
+                const hours = buckets[block.bucket].hours;
+
+                if (block.bucket === 'sleep') {
+                    block.startHour = 0.0;
+                    block.endHour = hours;
+                    startCursor = hours;
+                } else if (block.bucket === 'morning') {
+                    block.startHour = startCursor;
+                    block.endHour = startCursor + hours;
+                    startCursor += hours;
+                } else {
+                    block.startHour = startCursor;
+                    block.endHour = Math.min(24.0, startCursor + (hours / 2)); // Proportional allocations
+                    startCursor = block.endHour;
+                }
+            });
+        }
+
+        function resetBudgetDefaults() {
+            buckets.sleep.hours = 6.0;
+            buckets.morning.hours = 1.5;
+            buckets.work.hours = 6.0;
+            buckets.gym.hours = 1.5;
+            buckets.cooking.hours = 2.0;
+            buckets.lunch_dinner.hours = 1.0;
+            buckets.career.hours = 1.0;
+            buckets.build.hours = 2.0;
+            buckets.learning.hours = 1.0;
+            buckets.portfolio.hours = 1.0;
+            buckets.pmprep.hours = 1.0;
+            buckets.misc.hours = 1.0;
+
+            openCustomizerModal();
+        }
+
+        function resetBudgetDefaultsAndRefresh() {
+            buckets.sleep.hours = 6.0;
+            buckets.morning.hours = 1.5;
+            buckets.work.hours = 6.0;
+            buckets.gym.hours = 1.5;
+            buckets.cooking.hours = 2.0;
+            buckets.lunch_dinner.hours = 1.0;
+            buckets.career.hours = 1.0;
+            buckets.build.hours = 2.0;
+            buckets.learning.hours = 1.0;
+            buckets.portfolio.hours = 1.0;
+            buckets.pmprep.hours = 1.0;
+            buckets.misc.hours = 1.0;
+
+            saveScheduleDB();
+            renderSidebarBuckets();
+            renderView();
+            updateZenFocusWidget();
+        }
+
+        function closeCustomizerModal() {
+            document.getElementById('budget-modal').classList.add('hidden');
+        }
+
+        function changeWeek(direction) {
+            selectedDate.setDate(selectedDate.getDate() + (direction * 7));
+            initializeChecklistsForCurrentWeek();
+            renderView();
+            updateTimeIndicator();
+        }
+
+        function goToToday() {
+            selectedDate = new Date(START_DATE); // Lock to simulated date
+            renderView();
+            updateTimeIndicator();
+        }
+
+        // View scale listeners (Day/Week view)
+        const viewWeekBtn = document.getElementById('view-week');
+        const viewDayBtn = document.getElementById('view-day');
+        
+        if (viewWeekBtn && viewDayBtn) {
+            viewWeekBtn.onclick = () => {
+                currentView = 'week';
+                viewWeekBtn.className = "px-3 py-1 rounded text-xs font-semibold bg-canvas text-stone-950 shadow-sm transition";
+                viewDayBtn.className = "px-3 py-1 rounded text-xs font-medium text-muted hover:text-sand transition";
+                renderView();
+                updateTimeIndicator();
+            };
+
+            viewDayBtn.onclick = () => {
+                currentView = 'day';
+                viewDayBtn.className = "px-3 py-1 rounded text-xs font-semibold bg-canvas text-stone-950 shadow-sm transition";
+                viewWeekBtn.className = "px-3 py-1 rounded text-xs font-medium text-muted hover:text-sand transition";
+                renderView();
+                updateTimeIndicator();
+            };
+        }
+
+        // Initialize grid headers, background slots, and checklists on load
+        initializeChecklistsForCurrentWeek();
+
+        // 15 seconds refresh for indicators
+        setInterval(() => {
+            updateTimeIndicator();
+            updateZenFocusWidget();
+        }, 15000);
+
+        // Center scroll window to daylight hours (approx 6:00 AM coordinate -> 6 * 80px = 480px)
+        setTimeout(() => {
+            const scrollContainer = document.getElementById('timetable-scroll-container');
+            if (scrollContainer) {
+                scrollContainer.scrollLeft = 320;
+            }
+        }, 200);
+
+    </script>
+</body>
+
+</html>

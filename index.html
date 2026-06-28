@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow — Intention Board & Grid</title>
+    <!-- Google Fonts: Inter, Caveat (hand-written logo), & DM Serif Display (editorial headers) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;600;700&family=DM+Serif+Display:ital@0;1&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Dashboard Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Phosphor Icons for Timetable Grid -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        caveat: ['Caveat', 'cursive'],
+                        serif: ['DM Serif Display', 'serif'],
+                    },
+                    colors: {
+                        cream: '#FDFDFC',
+                        'muted-grey': '#F5F5F5',
+                        'dark-text': '#1F1F1F',
+                        'subtle-text': '#888888',
+                        'hover-bg': '#F0F3F6',
+                        'accent-subtle': '#F0F0F0',
+                        'charcoal': '#1A1A1A',
+                        canvas: '#fdfbfa',
+                        panel: '#f6f2eb',
+                        border: '#e6ded4',
+                        muted: '#7d7162',
+                        sand: '#2b241e',
+                        accent: {
+                            terracotta: '#bd5338',
+                            sage: '#5c6e4f',
+                            sand: '#2b241e',
+                            ochre: '#a87834',
+                            charcoal: '#4a433b',
+                            clay: '#736253'
+                        }
+                    },
+                    boxShadow: {
+                        'subtle': '0 2px 8px rgba(0, 0, 0, 0.015)',
+                        'board': '0 4px 20px rgba(0, 0, 0, 0.02)',
+                        'board-hover': '0 6px 24px rgba(0, 0, 0, 0.04)',
+                        'ghost': '0 10px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.03)'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="h-screen flex flex-col antialiased selection:bg-gray-200 selection:text-black">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>
