@@ -1,3 +1,4 @@
+// Flow - Main Application Component
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
