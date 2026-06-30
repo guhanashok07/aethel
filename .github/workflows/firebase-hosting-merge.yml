@@ -19,3 +19,4 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_FLOW_2026_1C372 }}
           channelId: live
           projectId: flow-2026-1c372
+          firebaseToolsVersion: 15.22.1
