@@ -99,6 +99,11 @@ export default function App() {
     const [syncing, setSyncing] = useState(false);
     const [currentFloatHour, setCurrentFloatHour] = useState(0);
 
+    function triggerSyncIndicator() {
+        setSyncing(true);
+        setTimeout(() => setSyncing(false), 2000);
+    }
+
     // Modals states
     const [isArchiveOpen, setIsArchiveOpen] = useState(false);
     const [isRoutineOpen, setIsRoutineOpen] = useState(false);
@@ -344,11 +349,6 @@ export default function App() {
     }, [scheduleBlocks, currentFloatHour]);
 
     // Helpers
-    const triggerSyncIndicator = () => {
-        setSyncing(true);
-        setTimeout(() => setSyncing(false), 2000);
-    };
-
     const formatHour = (h) => {
         let displayHour = Math.floor(h);
         if (displayHour >= 24) {
