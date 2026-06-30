@@ -70,4 +70,18 @@ export const getScheduleDoc = (uid) => {
     return doc(db, 'users', TARGET_UID, 'schedule', 'state');
 };
 
+export const getEntitiesCol = (uid) => {
+    if (isWorkspace && uid) {
+        return collection(db, 'artifacts', appId, 'users', uid, 'entities');
+    }
+    return collection(db, 'users', TARGET_UID, 'entities');
+};
+
+export const getRelationsCol = (uid) => {
+    if (isWorkspace && uid) {
+        return collection(db, 'artifacts', appId, 'users', uid, 'relations');
+    }
+    return collection(db, 'users', TARGET_UID, 'relations');
+};
+
 export { app, auth, db };

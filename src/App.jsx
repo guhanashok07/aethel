@@ -1,8 +1,6 @@
-// Flow - Main Application Component
+// Flow - Main Application Component (Decoupled Zustand edition)
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { onAuthStateChanged, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
-import { onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
-import { auth, db, getTasksCol, getBucketsCol, getScheduleDoc, isWorkspace, TARGET_UID } from './firebase';
+import { useStore } from './store/useStore';
 
 import BoardView from './components/BoardView';
 import ScheduleView from './components/ScheduleView';
@@ -21,7 +19,7 @@ const defaultMorningItems = [
     { id: "breakfast", label: "Cook & have clean breakfast", done: false }
 ];
 
-const defaultBuckets = {
+const defaultBucketsConfig = {
     sleep: { name: "Sleep & Recovery", hours: 6.0, color: "accent-charcoal", bgClass: "bg-accent-charcoal/20", borderClass: "border-accent-charcoal", hex: "#4a433b", description: "Essential recovery block" },
     routine: { name: "Routine & Eating", hours: 4.5, color: "accent-ochre", bgClass: "bg-accent-ochre/20", borderClass: "border-accent-ochre", hex: "#a87834", description: "Morning ritual, cooking, eating, chores" },
     work: { name: "Work, Career & L&D", hours: 9.0, color: "accent-sage", bgClass: "bg-accent-sage/20", borderClass: "border-accent-sage", hex: "#5c6e4f", description: "Internship, research, career prep, writing" },
@@ -30,14 +28,7 @@ const defaultBuckets = {
     margin: { name: "Buffer Margin", hours: 1.0, color: "accent-sand", bgClass: "bg-accent-sand/20", borderClass: "border-accent-sand", hex: "#2b241e", description: "Miscellaneous logistics, emails, buffer" }
 };
 
-const defaultStartupTasks = [
-    { id: "st-1", label: "Draft project proposal outlines", done: true },
-    { id: "st-2", label: "Prepare slide decks for team review", done: false },
-    { id: "st-3", label: "Refactor API request handling functions", done: false },
-    { id: "st-4", label: "Schedule target outreach call windows", done: false }
-];
-
-const dailyScheduleTemplate = [
+const defaultScheduleTemplate = [
     { id: "sleep-block-1", bucket: "sleep", startHour: 2.0, endHour: 6.0, name: "Deep Sleep & Recovery" },
     { id: "morning-routine-block", bucket: "routine", startHour: 6.0, endHour: 7.5, name: "Morning Routine" },
     { id: "work-block-1", bucket: "work", startHour: 7.5, endHour: 11.5, name: "Internship & Research: Core Depth" },
@@ -54,277 +45,38 @@ const dailyScheduleTemplate = [
 ];
 
 const START_DATE = new Date(2026, 5, 16); // June 16, 2026
-const initialToday = new Date();
 
 export default function App() {
     // Navigation / View Switcher State
     const [activeView, setActiveView] = useState('board');
-    console.log("Aethel v1.0.1 loaded successfully.");
+    console.log("Aethel loaded successfully.");
 
-    // Global Database Sync States
-    const [currentUser, setCurrentUser] = useState(null);
-    const [tasks, setTasks] = useState([]);
-    const [customBuckets, setCustomBuckets] = useState([]);
-    const [dateOffset, setDateOffset] = useState(0);
+    // Retrieve Zustand store states and actions
+    const {
+        entities,
+        selectedDate,
+        currentFloatHour,
+        currentScheduleView,
+        syncing,
+        undoStack,
+        redoStack,
+        initAuth,
+        saveEntity,
+        deleteEntity,
+        setSelectedDate,
+        setCurrentFloatHour,
+        setCurrentScheduleView,
+        handleUndo,
+        handleRedo,
+        pushToUndoStack
+    } = useStore();
 
-    // Schedule Grid States
-    const [buckets, setBuckets] = useState(defaultBuckets);
-    const [checklistDatabase, setChecklistDatabase] = useState({});
-    const [startupTasks, setStartupTasks] = useState(defaultStartupTasks);
-    const [selectedDate, setSelectedDate] = useState(new Date(2026, 5, 16));
-    const [currentScheduleView, setCurrentScheduleView] = useState('week'); // 'week' | 'day'
-    const [scheduleBlocks, setScheduleBlocks] = useState(dailyScheduleTemplate);
-
-    // Reactively compute allocation bucket hours from active schedule blocks
-    const computedBuckets = useMemo(() => {
-        const copy = JSON.parse(JSON.stringify(buckets));
-        // Reset all hours to 0
-        Object.keys(copy).forEach(k => {
-            copy[k].hours = 0;
-        });
-        // Sum up from active schedule blocks
-        scheduleBlocks.forEach(block => {
-            if (copy[block.bucket]) {
-                copy[block.bucket].hours += (block.endHour - block.startHour);
-            }
-        });
-        // round to 1 decimal place
-        Object.keys(copy).forEach(k => {
-            copy[k].hours = parseFloat(copy[k].hours.toFixed(1));
-        });
-        return copy;
-    }, [scheduleBlocks, buckets]);
-
-    // UI Indicator states
-    const [syncing, setSyncing] = useState(false);
-    const [currentFloatHour, setCurrentFloatHour] = useState(0);
-
-    function triggerSyncIndicator() {
-        setSyncing(true);
-        setTimeout(() => setSyncing(false), 2000);
-    }
-
-    // Modals states
-    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
-    const [isRoutineOpen, setIsRoutineOpen] = useState(false);
-    const [routineModalDay, setRoutineModalDay] = useState(new Date(2026, 5, 16));
-    const [isBudgetOpen, setIsBudgetOpen] = useState(false);
-
-    // HTML5 Drag-and-Drop States
-    const [draggedTaskId, setDraggedTaskId] = useState(null);
-    const [draggedBucketId, setDraggedBucketId] = useState(null);
-    const originalParentRef = useRef(null);
-    const originalSiblingRef = useRef(null);
-
-    const switchView = (view) => {
-        setActiveView(view);
-    };
-
-    // Undo/Redo History States and Refs
-    const undoStackRef = useRef([]);
-    const redoStackRef = useRef([]);
-    const isSyncingHistoryRef = useRef(false);
-    const [historyTrigger, setHistoryTrigger] = useState(0);
-    const triggerHistoryRender = () => setHistoryTrigger(prev => prev + 1);
-
-    const pushToUndoStack = () => {
-        const snapshot = {
-            tasks: JSON.parse(JSON.stringify(tasks)),
-            customBuckets: JSON.parse(JSON.stringify(customBuckets))
-        };
-        undoStackRef.current.push(snapshot);
-        if (undoStackRef.current.length > 4) {
-            undoStackRef.current.shift();
-        }
-        redoStackRef.current = [];
-        triggerHistoryRender();
-    };
-
-    const applySnapshot = async (snapshot) => {
-        isSyncingHistoryRef.current = true;
-        const { tasks: targetTasks, customBuckets: targetBuckets } = snapshot;
-
-        const tasksToDelete = tasks.filter(t => !targetTasks.some(tt => tt.id === t.id));
-        const tasksToSave = targetTasks.filter(tt => {
-            const current = tasks.find(t => t.id === tt.id);
-            return !current || current.text !== tt.text || current.status !== tt.status || current.bucketId !== tt.bucketId || current.order !== tt.order;
-        });
-
-        const bucketsToDelete = customBuckets.filter(b => !targetBuckets.some(tb => tb.id === b.id));
-        const bucketsToSave = targetBuckets.filter(tb => {
-            const current = customBuckets.find(b => b.id === tb.id);
-            return !current || current.title !== tb.title || current.order !== tb.order || current.section !== tb.section;
-        });
-
-        setTasks(targetTasks);
-        setCustomBuckets(targetBuckets);
-
-        if (currentUser || !isWorkspace) {
-            const tasksCol = getTasksCol(currentUser?.uid);
-            const bucketsCol = getBucketsCol(currentUser?.uid);
-
-            tasksToDelete.forEach(t => deleteDoc(doc(tasksCol, t.id)).catch(e => console.error(e)));
-            tasksToSave.forEach(t => setDoc(doc(tasksCol, t.id), t).catch(e => console.error(e)));
-            bucketsToDelete.forEach(b => deleteDoc(doc(bucketsCol, b.id)).catch(e => console.error(e)));
-            bucketsToSave.forEach(b => setDoc(doc(bucketsCol, b.id), b).catch(e => console.error(e)));
-        }
-        triggerSyncIndicator();
-        
-        // Release the sync lock after a brief timeout to allow remote writes to settle
-        setTimeout(() => {
-            isSyncingHistoryRef.current = false;
-        }, 1000);
-    };
-
-    const handleUndo = async () => {
-        if (undoStackRef.current.length === 0) return;
-
-        const currentSnapshot = {
-            tasks: JSON.parse(JSON.stringify(tasks)),
-            customBuckets: JSON.parse(JSON.stringify(customBuckets))
-        };
-        redoStackRef.current.push(currentSnapshot);
-        if (redoStackRef.current.length > 4) {
-            redoStackRef.current.shift();
-        }
-
-        const previousSnapshot = undoStackRef.current.pop();
-        await applySnapshot(previousSnapshot);
-        triggerHistoryRender();
-    };
-
-    const handleRedo = async () => {
-        if (redoStackRef.current.length === 0) return;
-
-        const nextSnapshot = redoStackRef.current.pop();
-
-        const currentSnapshot = {
-            tasks: JSON.parse(JSON.stringify(tasks)),
-            customBuckets: JSON.parse(JSON.stringify(customBuckets))
-        };
-        undoStackRef.current.push(currentSnapshot);
-        if (undoStackRef.current.length > 4) {
-            undoStackRef.current.shift();
-        }
-
-        await applySnapshot(nextSnapshot);
-        triggerHistoryRender();
-    };
-
-    // Keyboard event listener for Undo/Redo
+    // Init Auth on mount
     useEffect(() => {
-        const handleKeyDown = (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
-                e.preventDefault();
-                if (e.shiftKey) {
-                    handleRedo();
-                } else {
-                    handleUndo();
-                }
-            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
-                e.preventDefault();
-                handleRedo();
-            }
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [tasks, customBuckets, currentUser]);
-
-    // 1. Initialize Firebase Auth
-    useEffect(() => {
-        const initAuth = async () => {
-            let token = undefined;
-            try {
-                if (typeof __initial_auth_token !== 'undefined') {
-                    token = __initial_auth_token;
-                } else if (typeof window !== 'undefined' && window.__initial_auth_token) {
-                    token = window.__initial_auth_token;
-                }
-            } catch (e) {}
-
-            if (token) {
-                await signInWithCustomToken(auth, token).catch((err) => {
-                    console.error("Custom token sign in failed, falling back to anonymous:", err);
-                    return signInAnonymously(auth);
-                });
-            } else {
-                await signInAnonymously(auth).catch((err) => {
-                    console.error("Anonymous sign in failed:", err);
-                });
-            }
-        };
         initAuth();
+    }, [initAuth]);
 
-        const unsub = onAuthStateChanged(auth, (user) => {
-            setCurrentUser(user);
-        });
-        return unsub;
-    }, []);
-
-    // 2. Setup Firestore Listeners
-    useEffect(() => {
-        if (!currentUser) return;
-
-        const tasksCol = getTasksCol(currentUser?.uid);
-        const bucketsCol = getBucketsCol(currentUser?.uid);
-        const scheduleDocRef = getScheduleDoc(currentUser?.uid);
-
-        const unsubTasks = onSnapshot(tasksCol, (snap) => {
-            if (isSyncingHistoryRef.current) return;
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setTasks(data);
-            triggerSyncIndicator();
-        });
-
-        const unsubBuckets = onSnapshot(bucketsCol, (snap) => {
-            if (isSyncingHistoryRef.current) return;
-            const data = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0));
-            setCustomBuckets(data);
-            triggerSyncIndicator();
-        });
-
-        const unsubSchedule = onSnapshot(scheduleDocRef, (snap) => {
-            if (snap.exists()) {
-                const data = snap.data();
-                const isOldBuckets = data.buckets && Object.keys(data.buckets).length > 6;
-                const hasOldBucketKeys = data.scheduleBlocks && data.scheduleBlocks.some(b => !['sleep', 'routine', 'work', 'fitness', 'startup', 'margin'].includes(b.bucket));
-
-                if (isOldBuckets || hasOldBucketKeys) {
-                    setBuckets(defaultBuckets);
-                    setScheduleBlocks(dailyScheduleTemplate);
-                    setDoc(scheduleDocRef, {
-                        buckets: defaultBuckets,
-                        startupTasks: data.startupTasks || defaultStartupTasks,
-                        checklistDatabase: data.checklistDatabase || {},
-                        scheduleBlocks: dailyScheduleTemplate
-                    });
-                } else {
-                    if (data.buckets) setBuckets(data.buckets);
-                    if (data.startupTasks) setStartupTasks(data.startupTasks);
-                    if (data.checklistDatabase) setChecklistDatabase(data.checklistDatabase);
-                    if (data.scheduleBlocks) setScheduleBlocks(data.scheduleBlocks);
-                    else setScheduleBlocks(dailyScheduleTemplate);
-                }
-                triggerSyncIndicator();
-            } else {
-                // Initialize default doc
-                setDoc(scheduleDocRef, {
-                    buckets: defaultBuckets,
-                    startupTasks: defaultStartupTasks,
-                    checklistDatabase: {},
-                    scheduleBlocks: dailyScheduleTemplate
-                });
-            }
-        });
-
-        return () => {
-            unsubTasks();
-            unsubBuckets();
-            unsubSchedule();
-        };
-    }, [currentUser]);
-
-    // 3. Keep currentFloatHour updated for Live Marker
+    // Keep currentFloatHour updated for Live Marker
     useEffect(() => {
         const updateHour = () => {
             const now = new Date();
@@ -333,7 +85,100 @@ export default function App() {
         updateHour();
         const interval = setInterval(updateHour, 15000); // refresh every 15s
         return () => clearInterval(interval);
-    }, []);
+    }, [setCurrentFloatHour]);
+
+    // -------------------------------------------------------------
+    // Data Mappings (Entities -> Component Formats)
+    // -------------------------------------------------------------
+
+    // 1. Board tasks (exclude startup tasks)
+    const tasksMapped = useMemo(() => {
+        return entities
+            .filter(e => e.type === 'task' && e.properties?.bucketId !== 'startup')
+            .map(e => ({
+                id: e.id,
+                text: e.title,
+                bucketId: e.properties?.bucketId,
+                status: e.properties?.status,
+                order: e.properties?.order ?? 0
+            }));
+    }, [entities]);
+
+    // 2. Custom Columns / Buckets
+    const customBucketsMapped = useMemo(() => {
+        return entities
+            .filter(e => e.type === 'bucket')
+            .map(e => ({
+                id: e.id,
+                title: e.title,
+                section: e.properties?.section || 'spaces',
+                order: e.properties?.order ?? 0
+            }));
+    }, [entities]);
+
+    // 3. Time Buckets Configuration
+    const bucketsConfig = useMemo(() => {
+        const configEntity = entities.find(e => e.id === 'buckets_config');
+        return configEntity?.properties?.buckets || defaultBucketsConfig;
+    }, [entities]);
+
+    // 4. Reactive Allocation Buckets (sums block times dynamically)
+    const computedBuckets = useMemo(() => {
+        const copy = JSON.parse(JSON.stringify(bucketsConfig));
+        // Reset all hours to 0
+        Object.keys(copy).forEach(k => {
+            copy[k].hours = 0;
+        });
+        // Sum from active blocks
+        const blocks = entities.filter(e => e.type === 'event');
+        blocks.forEach(block => {
+            const bucketKey = block.properties?.bucketKey;
+            if (copy[bucketKey]) {
+                copy[bucketKey].hours += (block.properties?.endHour - block.properties?.startHour);
+            }
+        });
+        // Round
+        Object.keys(copy).forEach(k => {
+            copy[k].hours = parseFloat(copy[k].hours.toFixed(1));
+        });
+        return copy;
+    }, [entities, bucketsConfig]);
+
+    // 5. Startup Tasks
+    const startupTasksMapped = useMemo(() => {
+        return entities
+            .filter(e => e.type === 'task' && e.properties?.bucketId === 'startup')
+            .map(e => ({
+                id: e.id,
+                label: e.title,
+                done: e.properties?.status === 'done'
+            }));
+    }, [entities]);
+
+    // 6. Checklist Database
+    const checklistDatabaseMapped = useMemo(() => {
+        const db = {};
+        entities
+            .filter(e => e.type === 'journal' && e.id.startsWith('checklist-'))
+            .forEach(e => {
+                const dateStr = e.id.replace('checklist-', '');
+                db[dateStr] = e.properties?.items;
+            });
+        return db;
+    }, [entities]);
+
+    // 7. Schedule blocks
+    const scheduleBlocksMapped = useMemo(() => {
+        return entities
+            .filter(e => e.type === 'event')
+            .map(e => ({
+                id: e.id,
+                bucket: e.properties?.bucketKey,
+                startHour: e.properties?.startHour,
+                endHour: e.properties?.endHour,
+                name: e.title
+            }));
+    }, [entities]);
 
     // Compute currently active block for zen focus card
     const activeBlock = useMemo(() => {
@@ -341,19 +186,21 @@ export default function App() {
         if (adjustedHour < 2.0) {
             adjustedHour += 24.0;
         }
-        let active = scheduleBlocks.find(b => adjustedHour >= b.startHour && adjustedHour < b.endHour);
+        let active = scheduleBlocksMapped.find(b => adjustedHour >= b.startHour && adjustedHour < b.endHour);
         if (!active) {
-            active = scheduleBlocks[0] || dailyScheduleTemplate[0]; // fallback
+            active = scheduleBlocksMapped[0] || { id: 'fallback', bucket: 'sleep', startHour: 2.0, endHour: 6.0, name: 'Deep Sleep' };
         }
         return active;
-    }, [scheduleBlocks, currentFloatHour]);
+    }, [scheduleBlocksMapped, currentFloatHour]);
 
-    // Helpers
+    // -------------------------------------------------------------
+    // UI Helpers & Grid Controllers
+    // -------------------------------------------------------------
+    const [dateOffset, setDateOffset] = useState(0);
+
     const formatHour = (h) => {
         let displayHour = Math.floor(h);
-        if (displayHour >= 24) {
-            displayHour -= 24;
-        }
+        if (displayHour >= 24) displayHour -= 24;
         const mins = Math.round((h % 1) * 60);
         const suffix = displayHour >= 12 ? 'PM' : 'AM';
         let TwelveHour = displayHour;
@@ -365,7 +212,7 @@ export default function App() {
     const getWeekDays = (startDate) => {
         const current = new Date(startDate);
         const day = current.getDay();
-        const diff = current.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is Sunday
+        const diff = current.getDate() - day + (day === 0 ? -6 : 1);
         const monday = new Date(current.setDate(diff));
         
         const days = [];
@@ -379,7 +226,7 @@ export default function App() {
     const getTimelineStructure = () => {
         const cols = [];
         for (let i = 0; i < 7; i++) {
-            const d = new Date(initialToday);
+            const d = new Date();
             d.setDate(d.getDate() + dateOffset + i);
             cols.push({
                 id: `date-${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`,
@@ -389,248 +236,274 @@ export default function App() {
         return cols;
     };
 
-    // ==========================================
-    // Database Operations (Writes)
-    // ==========================================
-    const saveTaskDB = (t) => {
-        if (currentUser || !isWorkspace) {
-            setDoc(doc(getTasksCol(currentUser?.uid), t.id), t);
-        }
-    };
-
-    const saveBucketDB = (b) => {
-        if (currentUser || !isWorkspace) {
-            setDoc(doc(getBucketsCol(currentUser?.uid), b.id), b);
-        }
-    };
-
-    const saveScheduleDB = (updatedBuckets, updatedMilestones, updatedChecklists, updatedBlocks) => {
-        if (currentUser || !isWorkspace) {
-            const finalBuckets = updatedBuckets || computedBuckets;
-            const finalBlocks = updatedBlocks || scheduleBlocks;
-            setDoc(getScheduleDoc(currentUser?.uid), {
-                buckets: finalBuckets,
-                startupTasks: updatedMilestones || startupTasks,
-                checklistDatabase: updatedChecklists || checklistDatabase,
-                scheduleBlocks: finalBlocks
-            }).catch(err => console.error("Firestore write error (schedule):", err));
-        }
-    };
-
-    const handleMoveScheduleBlock = (blockId, newStart, newEnd) => {
-        const updated = scheduleBlocks.map(b => 
-            b.id === blockId ? { ...b, startHour: newStart, endHour: newEnd } : b
-        );
-        setScheduleBlocks(updated);
-        saveScheduleDB(computedBuckets, startupTasks, checklistDatabase, updated);
-    };
-
-    const handleResizeScheduleBlock = (blockId, newStart, newEnd) => {
-        const updated = scheduleBlocks.map(b => 
-            b.id === blockId ? { ...b, startHour: newStart, endHour: newEnd } : b
-        );
-        setScheduleBlocks(updated);
-        saveScheduleDB(computedBuckets, startupTasks, checklistDatabase, updated);
-    };
-
-    const handleDeleteScheduleBlock = (blockId) => {
-        const updated = scheduleBlocks.filter(b => b.id !== blockId);
-        setScheduleBlocks(updated);
-        saveScheduleDB(computedBuckets, startupTasks, checklistDatabase, updated);
-    };
-
-    const handleAddNewScheduleBlock = (name, bucketKey) => {
-        const newBlock = {
-            id: 'block-' + Date.now(),
-            bucket: bucketKey,
-            startHour: 12.0,
-            endHour: 13.0,
-            name: name || computedBuckets[bucketKey]?.name || 'New Block'
-        };
-        const updated = [...scheduleBlocks, newBlock];
-        setScheduleBlocks(updated);
-        saveScheduleDB(computedBuckets, startupTasks, checklistDatabase, updated);
-    };
-
-    // ==========================================
-    // Kanban Actions
-    // ==========================================
+    // -------------------------------------------------------------
+    // Board Actions (CRUD Entity wrappers)
+    // -------------------------------------------------------------
     const handleAddNewTask = (text, bucketId) => {
         pushToUndoStack();
-        const activeCount = tasks.filter(x => x.bucketId === bucketId && x.status === 'active').length;
-        const newTask = {
+        const activeCount = entities.filter(e => e.type === 'task' && e.properties?.bucketId === bucketId && e.properties?.status === 'active').length;
+        const newEntity = {
             id: 't' + Date.now(),
-            text: text,
-            bucketId: bucketId,
-            status: 'active',
-            order: activeCount
+            type: 'task',
+            title: text,
+            content: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            properties: {
+                bucketId,
+                status: 'active',
+                order: activeCount
+            }
         };
-        const updated = [...tasks, newTask];
-        setTasks(updated);
-        saveTaskDB(newTask);
+        saveEntity(newEntity);
     };
 
     const handleUpdateTaskText = (id, text) => {
-        const t = tasks.find(x => x.id === id);
-        if (t && text.trim() && t.text !== text.trim()) {
+        const e = entities.find(x => x.id === id);
+        if (e && text.trim() && e.title !== text.trim()) {
             pushToUndoStack();
-            t.text = text.trim();
-            saveTaskDB(t);
+            saveEntity({
+                ...e,
+                title: text.trim(),
+                updatedAt: new Date().toISOString()
+            });
         }
     };
 
     const handleCompleteTask = (id) => {
-        const t = tasks.find(x => x.id === id);
-        if (t) {
+        const e = entities.find(x => x.id === id);
+        if (e) {
             pushToUndoStack();
-            t.status = 'archived';
-            saveTaskDB(t);
+            saveEntity({
+                ...e,
+                updatedAt: new Date().toISOString(),
+                properties: { ...e.properties, status: 'archived' }
+            });
         }
     };
 
     const handleRestoreTask = (id) => {
-        const t = tasks.find(x => x.id === id);
-        if (t) {
+        const e = entities.find(x => x.id === id);
+        if (e) {
             pushToUndoStack();
-            const activeCount = tasks.filter(x => x.bucketId === 'focus' && x.status === 'active').length;
-            t.status = 'active';
-            t.bucketId = 'focus';
-            t.order = activeCount;
-            saveTaskDB(t);
+            const activeCount = entities.filter(x => x.type === 'task' && x.properties?.bucketId === 'focus' && x.properties?.status === 'active').length;
+            saveEntity({
+                ...e,
+                updatedAt: new Date().toISOString(),
+                properties: {
+                    ...e.properties,
+                    status: 'active',
+                    bucketId: 'focus',
+                    order: activeCount
+                }
+            });
         }
     };
 
     const handleDeleteTask = (id) => {
         if (confirm("Permanently delete this task?")) {
-            pushToUndoStack();
-            setTasks(prev => prev.filter(x => x.id !== id));
-            if (currentUser || !isWorkspace) {
-                deleteDoc(doc(getTasksCol(currentUser?.uid), id));
-            }
+            deleteEntity(id);
         }
     };
 
     const handleAddNewSpace = (title, section = 'spaces') => {
         pushToUndoStack();
-        const newSpace = {
+        const bucketEntities = entities.filter(e => e.type === 'bucket');
+        const newBucket = {
             id: 'b' + Date.now(),
-            title: title,
-            section: section,
-            order: customBuckets.length
+            type: 'bucket',
+            title,
+            content: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            properties: {
+                section,
+                order: bucketEntities.length
+            }
         };
-        setCustomBuckets(prev => [...prev, newSpace]);
-        saveBucketDB(newSpace);
+        saveEntity(newBucket);
     };
 
     const handleUpdateSpaceTitle = (id, text) => {
-        const b = customBuckets.find(x => x.id === id);
-        if (b && text.trim() && b.title !== text.trim()) {
+        const e = entities.find(x => x.id === id);
+        if (e && text.trim() && e.title !== text.trim()) {
             pushToUndoStack();
-            b.title = text.trim();
-            saveBucketDB(b);
+            saveEntity({
+                ...e,
+                title: text.trim(),
+                updatedAt: new Date().toISOString()
+            });
         }
     };
 
     const handleDeleteSpace = (id) => {
         if (confirm("Delete space?")) {
             pushToUndoStack();
-            const tasksToDelete = tasks.filter(t => t.bucketId === id);
-            setCustomBuckets(prev => prev.filter(x => x.id !== id));
-            setTasks(prev => prev.filter(t => t.bucketId !== id));
-
-            if (currentUser || !isWorkspace) {
-                deleteDoc(doc(getBucketsCol(currentUser?.uid), id));
-                tasksToDelete.forEach(t => {
-                    deleteDoc(doc(getTasksCol(currentUser?.uid), t.id));
-                });
-            }
+            const childTasks = entities.filter(t => t.type === 'task' && t.properties?.bucketId === id);
+            deleteEntity(id);
+            childTasks.forEach(t => deleteEntity(t.id));
         }
     };
 
-    // ==========================================
-    // Timeline Schedule Actions
-    // ==========================================
+    // -------------------------------------------------------------
+    // Schedule Actions (CRUD Entity wrappers)
+    // -------------------------------------------------------------
     const handleToggleZenItem = (itemId) => {
         const todayStr = new Date(2026, 5, 16).toISOString().split('T')[0];
-        const nextChecklist = { ...checklistDatabase };
-        if (!nextChecklist[todayStr]) {
-            nextChecklist[todayStr] = JSON.parse(JSON.stringify(defaultMorningItems));
-        }
-        const item = nextChecklist[todayStr].find(i => i.id === itemId);
-        if (item) {
-            item.done = !item.done;
-            setChecklistDatabase(nextChecklist);
-            saveScheduleDB(buckets, startupTasks, nextChecklist);
-        }
+        handleToggleZenItemFromModal(todayStr, itemId);
     };
 
     const handleToggleZenItemFromModal = (dateStr, itemId) => {
-        const nextChecklist = { ...checklistDatabase };
-        if (!nextChecklist[dateStr]) {
-            nextChecklist[dateStr] = JSON.parse(JSON.stringify(defaultMorningItems));
-        }
-        const item = nextChecklist[dateStr].find(i => i.id === itemId);
+        const id = `checklist-${dateStr}`;
+        const existing = entities.find(e => e.id === id);
+        const items = existing
+            ? JSON.parse(JSON.stringify(existing.properties?.items || []))
+            : JSON.parse(JSON.stringify(defaultMorningItems));
+        const item = items.find(i => i.id === itemId);
         if (item) {
             item.done = !item.done;
-            setChecklistDatabase(nextChecklist);
-            saveScheduleDB(buckets, startupTasks, nextChecklist);
+            saveEntity({
+                id,
+                type: 'journal',
+                title: `Checklist for ${dateStr}`,
+                createdAt: existing ? existing.createdAt : new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                properties: { items }
+            });
         }
     };
 
     const handleToggleStartupTask = (id) => {
-        const updated = startupTasks.map(t => t.id === id ? { ...t, done: !t.done } : t);
-        setStartupTasks(updated);
-        saveScheduleDB(buckets, updated, checklistDatabase);
+        const e = entities.find(x => x.id === id);
+        if (e) {
+            saveEntity({
+                ...e,
+                updatedAt: new Date().toISOString(),
+                properties: {
+                    ...e.properties,
+                    status: e.properties?.status === 'done' ? 'active' : 'done'
+                }
+            });
+        }
     };
 
     const handleAddNewStartupTask = (label) => {
-        const newTask = { id: 'st-' + Date.now(), label, done: false };
-        const updated = [...startupTasks, newTask];
-        setStartupTasks(updated);
-        saveScheduleDB(buckets, updated, checklistDatabase);
+        const newEntity = {
+            id: 'st-' + Date.now(),
+            type: 'task',
+            title: label,
+            content: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            properties: {
+                bucketId: 'startup',
+                status: 'active',
+                order: 0
+            }
+        };
+        saveEntity(newEntity);
     };
 
-    const handleDeleteStartupTask = (id) => {
-        const updated = startupTasks.filter(t => t.id !== id);
-        setStartupTasks(updated);
-        saveScheduleDB(buckets, updated, checklistDatabase);
+    const handleMoveScheduleBlock = (blockId, newStart, newEnd) => {
+        const e = entities.find(x => x.id === blockId);
+        if (e) {
+            saveEntity({
+                ...e,
+                updatedAt: new Date().toISOString(),
+                properties: {
+                    ...e.properties,
+                    startHour: newStart,
+                    endHour: newEnd
+                }
+            });
+        }
+    };
+
+    const handleAddNewScheduleBlock = (name, bucketKey) => {
+        const newBlock = {
+            id: 'block-' + Date.now(),
+            type: 'event',
+            title: name || bucketsConfig[bucketKey]?.name || 'New Block',
+            content: '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            properties: {
+                bucketKey,
+                startHour: 12.0,
+                endHour: 13.0
+            }
+        };
+        saveEntity(newBlock);
     };
 
     const handleSaveBudget = (updatedBuckets) => {
-        // Rebuild blocks sequentially based on new budget
-        let startCursor = 2.0; // Start at 2 AM
-        const rebuiltBlocks = scheduleBlocks.map(block => {
-            const hours = updatedBuckets[block.bucket]?.hours ?? 0;
-            const count = scheduleBlocks.filter(b => b.bucket === block.bucket).length || 1;
+        pushToUndoStack();
+        let startCursor = 2.0;
+        const blocks = entities.filter(e => e.type === 'event');
+
+        blocks.forEach(block => {
+            const hours = updatedBuckets[block.properties?.bucketKey]?.hours ?? 0;
+            const count = blocks.filter(b => b.properties?.bucketKey === block.properties?.bucketKey).length || 1;
             const duration = hours / count;
             const start = startCursor;
             const end = Math.min(26.0, startCursor + duration);
             startCursor = end;
-            return {
-                ...block,
-                startHour: start,
-                endHour: end
-            };
-        });
-        setBuckets(updatedBuckets);
-        setScheduleBlocks(rebuiltBlocks);
-        saveScheduleDB(updatedBuckets, startupTasks, checklistDatabase, rebuiltBlocks);
-    };
 
-    const handleResetBudget = () => {
-        const resetBuckets = JSON.parse(JSON.stringify(defaultBuckets));
-        return resetBuckets;
+            saveEntity({
+                ...block,
+                updatedAt: new Date().toISOString(),
+                properties: {
+                    ...block.properties,
+                    startHour: start,
+                    endHour: end
+                }
+            });
+        });
+
+        saveEntity({
+            id: 'buckets_config',
+            type: 'config',
+            title: 'Buckets Config',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            properties: { buckets: updatedBuckets }
+        });
     };
 
     const handleResetBudgetDefaultsAndRefresh = () => {
-        const resetBuckets = JSON.parse(JSON.stringify(defaultBuckets));
-        setBuckets(resetBuckets);
-        setScheduleBlocks(dailyScheduleTemplate);
-        saveScheduleDB(resetBuckets, startupTasks, checklistDatabase, dailyScheduleTemplate);
+        pushToUndoStack();
+        // Reset Config
+        saveEntity({
+            id: 'buckets_config',
+            type: 'config',
+            title: 'Buckets Config',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            properties: { buckets: defaultBucketsConfig }
+        });
+
+        // Recreate default events
+        const events = entities.filter(e => e.type === 'event');
+        events.forEach(e => deleteEntity(e.id));
+
+        defaultScheduleTemplate.forEach((block) => {
+            saveEntity({
+                id: block.id,
+                type: 'event',
+                title: block.name,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                properties: {
+                    bucketKey: block.bucket,
+                    startHour: block.startHour,
+                    endHour: block.endHour
+                }
+            });
+        });
     };
 
     const handleShowGenericBlockDetails = (block, day) => {
-        const meta = buckets[block.bucket] || {};
+        const meta = computedBuckets[block.bucket] || {};
         const toast = document.createElement('div');
         toast.className = 'fixed bottom-6 right-6 bg-panel border border-border p-4 rounded-xl shadow-2xl z-50 flex flex-col gap-2 max-w-sm transition-all duration-300 transform translate-y-0 opacity-100';
         toast.innerHTML = `
@@ -655,9 +528,14 @@ export default function App() {
         }, 4000);
     };
 
-    // ==========================================
-    // Native HTML5 Drag and Drop Handlers (React Port)
-    // ==========================================
+    // -------------------------------------------------------------
+    // Drag-and-Drop state handlers
+    // -------------------------------------------------------------
+    const [draggedTaskId, setDraggedTaskId] = useState(null);
+    const [draggedBucketId, setDraggedBucketId] = useState(null);
+    const originalParentRef = useRef(null);
+    const originalSiblingRef = useRef(null);
+
     const handleDragStartTask = (ev, taskId) => {
         ev.stopPropagation();
         setDraggedTaskId(taskId);
@@ -667,28 +545,26 @@ export default function App() {
             originalParentRef.current = draggedDOM.parentElement;
             originalSiblingRef.current = draggedDOM.nextSibling;
         }
-
         ev.currentTarget.classList.add('dragging');
     };
 
     const handleDragEndTask = (ev) => {
         ev.currentTarget.classList.remove('dragging');
-        
         const draggedDOM = document.getElementById(draggedTaskId);
         
-        // 1. Gather all required state updates from the DOM structure
+        // Gather order updates from DOM structure
         const updates = [];
         document.querySelectorAll('.board-column').forEach(col => {
             const colId = col.id.replace('board-', '');
             col.querySelectorAll('.task-card').forEach((card, idx) => {
-                const t = tasks.find(x => x.id === card.id);
-                if (t && (t.bucketId !== colId || t.order !== idx)) {
-                    updates.push({ task: t, newBucketId: colId, newOrder: idx });
+                const t = entities.find(x => x.id === card.id);
+                if (t && (t.properties?.bucketId !== colId || t.properties?.order !== idx)) {
+                    updates.push({ entity: t, newBucketId: colId, newOrder: idx });
                 }
             });
         });
 
-        // 2. Restore DOM to original state before state change to prevent React crash
+        // Restore DOM to original state before state change to prevent React crash
         if (draggedDOM && originalParentRef.current) {
             const sibling = originalSiblingRef.current;
             if (sibling && sibling.parentNode === originalParentRef.current) {
@@ -703,20 +579,18 @@ export default function App() {
         setDraggedTaskId(null);
         document.querySelectorAll('.board-container').forEach(c => c.classList.remove('drag-over'));
 
-        // 3. Apply updates to state
         if (updates.length > 0) {
             pushToUndoStack();
-            setTasks(prev => {
-                const copy = [...prev];
-                updates.forEach(({ task, newBucketId, newOrder }) => {
-                    const t = copy.find(x => x.id === task.id);
-                    if (t) {
-                        t.bucketId = newBucketId;
-                        t.order = newOrder;
-                        saveTaskDB(t);
+            updates.forEach(({ entity, newBucketId, newOrder }) => {
+                saveEntity({
+                    ...entity,
+                    updatedAt: new Date().toISOString(),
+                    properties: {
+                        ...entity.properties,
+                        bucketId: newBucketId,
+                        order: newOrder
                     }
                 });
-                return copy;
             });
         }
     };
@@ -751,10 +625,6 @@ export default function App() {
         }
     };
 
-    const handleDropOnColumn = (ev) => {
-        ev.preventDefault();
-    };
-
     const handleDragBucketStart = (ev, bucketId) => {
         ev.stopPropagation();
         setDraggedBucketId(bucketId);
@@ -765,9 +635,9 @@ export default function App() {
         ev.preventDefault();
         if (!draggedBucketId) return;
 
-        const bucket = customBuckets.find(cb => cb.id === draggedBucketId);
+        const bucket = entities.find(cb => cb.id === draggedBucketId);
         if (!bucket) return;
-        const containerId = bucket.section === 'focus' ? 'focus-boards' : 'custom-boards';
+        const containerId = bucket.properties?.section === 'focus' ? 'focus-boards' : 'custom-boards';
         const container = document.getElementById(containerId);
         if (!container) return;
 
@@ -782,35 +652,28 @@ export default function App() {
         }, { offset: Number.NEGATIVE_INFINITY }).element;
 
         const draggedDOM = container.querySelector(`[data-bucket="${draggedBucketId}"]`);
-        const inputDOM = document.getElementById(bucket.section === 'focus' ? 'new-focus-container' : 'new-bucket-container');
+        const inputDOM = document.getElementById(bucket.properties?.section === 'focus' ? 'new-focus-container' : 'new-bucket-container');
         if (draggedDOM) {
             if (!afterDOM) container.insertBefore(draggedDOM, inputDOM);
             else container.insertBefore(draggedDOM, afterDOM);
         }
     };
 
-    const handleDragBucketDrop = (ev) => {
-        ev.preventDefault();
-    };
-
     const handleDragBucketEnd = (ev) => {
         ev.currentTarget.classList.remove('opacity-40');
-        
-        const bucket = customBuckets.find(cb => cb.id === draggedBucketId);
+        const bucket = entities.find(cb => cb.id === draggedBucketId);
         setDraggedBucketId(null);
         if (!bucket) return;
 
-        const containerId = bucket.section === 'focus' ? 'focus-boards' : 'custom-boards';
+        const containerId = bucket.properties?.section === 'focus' ? 'focus-boards' : 'custom-boards';
         const boards = document.getElementById(containerId).querySelectorAll('.board-container[data-bucket]');
         
         let changed = false;
         boards.forEach((b, i) => {
             const bucketId = b.getAttribute('data-bucket');
             if (bucketId === 'focus') return;
-            const cb = customBuckets.find(x => x.id === bucketId);
-            if (cb && cb.order !== i) {
-                changed = true;
-            }
+            const cb = entities.find(x => x.id === bucketId);
+            if (cb && cb.properties?.order !== i) changed = true;
         });
 
         if (changed) {
@@ -819,29 +682,52 @@ export default function App() {
             boards.forEach((b) => {
                 const bucketId = b.getAttribute('data-bucket');
                 if (bucketId === 'focus') return;
-                const cb = customBuckets.find(x => x.id === bucketId);
+                const cb = entities.find(x => x.id === bucketId);
                 if (cb) {
-                    if (cb.order !== orderIndex) {
-                        cb.order = orderIndex;
-                        saveBucketDB(cb);
+                    if (cb.properties?.order !== orderIndex) {
+                        saveEntity({
+                            ...cb,
+                            updatedAt: new Date().toISOString(),
+                            properties: { ...cb.properties, order: orderIndex }
+                        });
                     }
                     orderIndex++;
                 }
             });
-            setCustomBuckets(prev => [...prev].sort((a, b) => (a.order || 0) - (b.order || 0)));
         }
     };
 
     // Toggle stylesheet references / bg colors
     useEffect(() => {
         if (activeView === 'board') {
-            document.body.style.backgroundColor = '#FDFDFC'; // Cream background
+            document.body.style.backgroundColor = '#FDFDFC';
         } else {
-            document.body.style.backgroundColor = '#fdfbfa'; // Canvas background
+            document.body.style.backgroundColor = '#fdfbfa';
         }
     }, [activeView]);
 
     const timelineDays = getTimelineStructure();
+
+    // Keyboard event listener for Undo/Redo
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) handleRedo();
+                else handleUndo();
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+                e.preventDefault();
+                handleRedo();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [handleUndo, handleRedo]);
+
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [isRoutineOpen, setIsRoutineOpen] = useState(false);
+    const [routineModalDay, setRoutineModalDay] = useState(new Date(2026, 5, 16));
+    const [isBudgetOpen, setIsBudgetOpen] = useState(false);
 
     return (
         <div className="h-screen flex flex-col antialiased select-none overflow-hidden">
@@ -870,13 +756,13 @@ export default function App() {
                     {/* Switch View Buttons */}
                     <div className="flex bg-white/10 p-0.5 rounded-lg border border-white/5 text-xs mr-2">
                         <button
-                            onClick={() => switchView('board')}
+                            onClick={() => setActiveView('board')}
                             className={`px-3 py-1 rounded font-semibold transition-all duration-200 ${activeView === 'board' ? 'bg-white text-charcoal shadow-sm' : 'text-gray-300 hover:text-white'}`}
                         >
                             Board
                         </button>
                         <button
-                            onClick={() => switchView('schedule')}
+                            onClick={() => setActiveView('schedule')}
                             className={`px-3 py-1 rounded font-semibold transition-all duration-200 ${activeView === 'schedule' ? 'bg-white text-charcoal shadow-sm' : 'text-gray-300 hover:text-white'}`}
                         >
                             Schedule
@@ -889,7 +775,7 @@ export default function App() {
                             onClick={handleUndo} 
                             title="Undo (Ctrl+Z)"
                             className="hover:text-white transition flex items-center text-gray-300 disabled:opacity-30 disabled:hover:text-gray-300"
-                            disabled={undoStackRef.current.length === 0}
+                            disabled={undoStack.length === 0}
                         >
                             <i className="fa-solid fa-rotate-left"></i>
                         </button>
@@ -897,7 +783,7 @@ export default function App() {
                             onClick={handleRedo} 
                             title="Redo (Ctrl+Y)"
                             className="hover:text-white transition flex items-center text-gray-300 disabled:opacity-30 disabled:hover:text-gray-300"
-                            disabled={redoStackRef.current.length === 0}
+                            disabled={redoStack.length === 0}
                         >
                             <i className="fa-solid fa-rotate-right"></i>
                         </button>
@@ -912,8 +798,8 @@ export default function App() {
             <div className="flex-1 flex flex-col overflow-hidden relative">
                 {activeView === 'board' ? (
                     <BoardView
-                        tasks={tasks}
-                        customBuckets={customBuckets}
+                        tasks={tasksMapped}
+                        customBuckets={customBucketsMapped}
                         dateOffset={dateOffset}
                         timelineDays={timelineDays}
                         onShiftDate={setDateOffset}
@@ -928,31 +814,31 @@ export default function App() {
                         onDragEndTask={handleDragEndTask}
                         onDragOverColumn={handleDragOverColumn}
                         onDragLeaveColumn={handleDragLeaveColumn}
-                        onDropOnColumn={handleDropOnColumn}
+                        onDropOnColumn={() => {}}
                         onDragBucketStart={handleDragBucketStart}
                         onDragBucketEnd={handleDragBucketEnd}
                         onDragBucketOver={handleDragBucketOver}
-                        onDragBucketDrop={handleDragBucketDrop}
+                        onDragBucketDrop={() => {}}
                     />
                 ) : (
                     <ScheduleView
                         buckets={computedBuckets}
-                        startupTasks={startupTasks}
-                        checklistDatabase={checklistDatabase}
+                        startupTasks={startupTasksMapped}
+                        checklistDatabase={checklistDatabaseMapped}
                         defaultMorningItems={defaultMorningItems}
                         activeBlock={activeBlock}
                         currentFloatHour={currentFloatHour}
                         selectedDate={selectedDate}
                         currentView={currentScheduleView}
-                        dailyScheduleTemplate={scheduleBlocks}
+                        dailyScheduleTemplate={scheduleBlocksMapped}
                         onToggleZenItem={handleToggleZenItem}
                         onToggleStartupTask={handleToggleStartupTask}
                         onAddNewStartupTask={handleAddNewStartupTask}
-                        onDeleteStartupTask={handleDeleteStartupTask}
+                        onDeleteStartupTask={handleDeleteTask}
                         onResetBudgetDefaultsAndRefresh={handleResetBudgetDefaultsAndRefresh}
                         onMoveScheduleBlock={handleMoveScheduleBlock}
-                        onResizeScheduleBlock={handleResizeScheduleBlock}
-                        onDeleteScheduleBlock={handleDeleteScheduleBlock}
+                        onResizeScheduleBlock={handleMoveScheduleBlock}
+                        onDeleteScheduleBlock={deleteEntity}
                         onAddScheduleBlock={handleAddNewScheduleBlock}
 
                         onChangeWeek={(dir) => {
@@ -981,7 +867,11 @@ export default function App() {
             <ArchiveModal
                 isOpen={isArchiveOpen}
                 onToggle={() => setIsArchiveOpen(false)}
-                tasks={tasks.filter(t => t.status === 'archived')}
+                tasks={entities.filter(e => e.type === 'task' && e.properties?.status === 'archived').map(e => ({
+                    id: e.id,
+                    text: e.title,
+                    bucketId: e.properties?.bucketId
+                }))}
                 onRestore={handleRestoreTask}
                 onDelete={handleDeleteTask}
             />
@@ -990,7 +880,7 @@ export default function App() {
                 isOpen={isRoutineOpen}
                 onClose={() => setIsRoutineOpen(false)}
                 day={routineModalDay}
-                checklistDatabase={checklistDatabase}
+                checklistDatabase={checklistDatabaseMapped}
                 defaultMorningItems={defaultMorningItems}
                 onToggleZenItem={handleToggleZenItemFromModal}
                 onToggleSkincareDay={() => {
@@ -1009,9 +899,9 @@ export default function App() {
             <BudgetModal
                 isOpen={isBudgetOpen}
                 onClose={() => setIsBudgetOpen(false)}
-                buckets={buckets}
+                buckets={bucketsConfig}
                 onSaveBudget={handleSaveBudget}
-                onResetBudget={handleResetBudget}
+                onResetBudget={() => defaultBucketsConfig}
             />
         </div>
     );
