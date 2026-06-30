@@ -4,6 +4,7 @@ import { useStore } from './store/useStore';
 
 import BoardView from './components/BoardView';
 import ScheduleView from './components/ScheduleView';
+import HomeView from './components/HomeView';
 import ArchiveModal from './components/ArchiveModal';
 import RoutineModal from './components/RoutineModal';
 import BudgetModal from './components/BudgetModal';
@@ -48,7 +49,7 @@ const START_DATE = new Date(2026, 5, 16); // June 16, 2026
 
 export default function App() {
     // Navigation / View Switcher State
-    const [activeView, setActiveView] = useState('board');
+    const [activeView, setActiveView] = useState('home');
     console.log("Aethel loaded successfully.");
 
     // Retrieve Zustand store states and actions
@@ -699,7 +700,9 @@ export default function App() {
 
     // Toggle stylesheet references / bg colors
     useEffect(() => {
-        if (activeView === 'board') {
+        if (activeView === 'home') {
+            document.body.style.backgroundColor = '#FAF8F5';
+        } else if (activeView === 'board') {
             document.body.style.backgroundColor = '#FDFDFC';
         } else {
             document.body.style.backgroundColor = '#fdfbfa';
@@ -756,6 +759,12 @@ export default function App() {
                     {/* Switch View Buttons */}
                     <div className="flex bg-white/10 p-0.5 rounded-lg border border-white/5 text-xs mr-2">
                         <button
+                            onClick={() => setActiveView('home')}
+                            className={`px-3 py-1 rounded font-semibold transition-all duration-200 ${activeView === 'home' ? 'bg-white text-charcoal shadow-sm' : 'text-gray-300 hover:text-white'}`}
+                        >
+                            Home
+                        </button>
+                        <button
                             onClick={() => setActiveView('board')}
                             className={`px-3 py-1 rounded font-semibold transition-all duration-200 ${activeView === 'board' ? 'bg-white text-charcoal shadow-sm' : 'text-gray-300 hover:text-white'}`}
                         >
@@ -796,7 +805,17 @@ export default function App() {
 
             {/* Layout Toggling */}
             <div className="flex-1 flex flex-col overflow-hidden relative">
-                {activeView === 'board' ? (
+                {activeView === 'home' && (
+                    <HomeView
+                        onNavigate={setActiveView}
+                        activeBlock={activeBlock}
+                        tasksCount={tasksMapped.filter(t => t.status === 'active').length}
+                        buckets={computedBuckets}
+                        entities={entities}
+                        saveEntity={saveEntity}
+                    />
+                )}
+                {activeView === 'board' && (
                     <BoardView
                         tasks={tasksMapped}
                         customBuckets={customBucketsMapped}
@@ -820,7 +839,8 @@ export default function App() {
                         onDragBucketOver={handleDragBucketOver}
                         onDragBucketDrop={() => {}}
                     />
-                ) : (
+                )}
+                {activeView === 'schedule' && (
                     <ScheduleView
                         buckets={computedBuckets}
                         startupTasks={startupTasksMapped}
