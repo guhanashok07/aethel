@@ -806,14 +806,7 @@ export default function App() {
             {/* Layout Toggling */}
             <div className="flex-1 flex flex-col overflow-hidden relative">
                 {activeView === 'home' && (
-                    <HomeView
-                        onNavigate={setActiveView}
-                        activeBlock={activeBlock}
-                        tasksCount={tasksMapped.filter(t => t.status === 'active').length}
-                        buckets={computedBuckets}
-                        entities={entities}
-                        saveEntity={saveEntity}
-                    />
+                    <HomeView onNavigate={setActiveView} />
                 )}
                 {activeView === 'board' && (
                     <BoardView
