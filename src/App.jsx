@@ -10,15 +10,58 @@ import RoutineModal from './components/RoutineModal';
 import BudgetModal from './components/BudgetModal';
 
 // Static Defaults
-const defaultMorningItems = [
-    { id: "water", label: "Drink big glass of water", done: true },
-    { id: "exercise", label: "Mild exercise with music on", done: false },
-    { id: "bath", label: "Bath (body wash & leave-in conditioner)", done: false },
-    { id: "skincare_moisture", label: "Skincare: Moisturizer w/ Niacinamide", done: false },
-    { id: "skincare_alt", label: "Skincare: Active Serum (Alternate days)", done: false },
-    { id: "sunscreen", label: "Apply daily sunscreen", done: false },
-    { id: "breakfast", label: "Cook & have clean breakfast", done: false }
+const defaultHabitGroups = [
+    {
+        id: 'morning',
+        label: 'Morning Routine',
+        icon: '☀️',
+        items: [
+            { id: 'exercise', label: 'Quick exercise', done: false },
+            { id: 'water_am', label: 'Water', done: false },
+            { id: 'skincare_vitc', label: 'Skin care — Vitamin C / Niacinamide', done: false },
+            { id: 'skincare_moist', label: 'Skin care — Moisturizer & sunscreen', done: false },
+            { id: 'supplements', label: 'Supplements — Finasteride, Seeds, Gummies & Fish oil', done: false },
+        ]
+    },
+    {
+        id: 'food',
+        label: 'Food',
+        icon: '🥗',
+        items: [
+            { id: 'water_lots', label: 'Lot of water', done: false },
+            { id: 'protein_shake', label: 'Protein shake', done: false },
+            { id: 'eggs', label: '4–6 eggs', done: false },
+            { id: 'meals', label: 'Healthy breakfast, lunch & dinner', done: false },
+            { id: 'yogurt', label: 'Yogurt', done: false },
+        ]
+    },
+    {
+        id: 'career',
+        label: 'Career',
+        icon: '💼',
+        items: [
+            { id: 'portfolio', label: 'Portfolio', done: false },
+            { id: 'building', label: 'Building', done: false },
+            { id: 'product_prep', label: 'Product prep', done: false },
+            { id: 'job_work', label: 'Job work — applications, interviews, networking', done: false },
+            { id: 'tech_ld', label: 'Technical L&D', done: false },
+            { id: 'vocab_comm', label: 'Vocab & communication', done: false },
+        ]
+    },
+    {
+        id: 'night',
+        label: 'Night Routine',
+        icon: '🌙',
+        items: [
+            { id: 'minoxidil', label: 'Minoxidil', done: false },
+            { id: 'retinol', label: 'Retinol & moisturizer', done: false },
+        ]
+    }
 ];
+
+// Flat list for backwards-compat (RoutineModal, etc.)
+const defaultMorningItems = defaultHabitGroups.flatMap(g => g.items);
+
 
 const defaultBucketsConfig = {
     sleep: { name: "Sleep & Recovery", hours: 6.0, color: "accent-charcoal", bgClass: "bg-accent-charcoal/20", borderClass: "border-accent-charcoal", hex: "#4a433b", description: "Essential recovery block" },
@@ -45,11 +88,39 @@ const defaultScheduleTemplate = [
     { id: "sleep-block-2", bucket: "sleep", startHour: 24.0, endHour: 26.0, name: "Night Rest & Sleep" }
 ];
 
-const START_DATE = new Date(2026, 5, 16); // June 16, 2026
+const START_DATE = new Date(); // Current system time
+
+// Configuration for serene floating dust particles
+const dustMotes = [
+    { id: 1, left: '12%', size: '10px', delay: '0s', duration: '16s' },
+    { id: 2, left: '28%', size: '8px', delay: '-3s', duration: '20s' },
+    { id: 3, left: '42%', size: '12px', delay: '-6s', duration: '18s' },
+    { id: 4, left: '58%', size: '9px', delay: '-1.5s', duration: '22s' },
+    { id: 5, left: '72%', size: '14px', delay: '-9s', duration: '15s' },
+    { id: 6, left: '88%', size: '8px', delay: '-4.5s', duration: '24s' },
+    { id: 7, left: '20%', size: '12px', delay: '-7.5s', duration: '19s' },
+    { id: 8, left: '65%', size: '10px', delay: '-11s', duration: '17s' },
+    { id: 9, left: '80%', size: '12px', delay: '-0.5s', duration: '21s' },
+    { id: 10, left: '5%', size: '8px', delay: '-13.5s', duration: '18s' }
+];
 
 export default function App() {
     // Navigation / View Switcher State
     const [activeView, setActiveView] = useState('home');
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+    // Track mouse position for dynamic spotlight interaction
+    useEffect(() => {
+        const handleMouseMove = (e) => {
+            setMousePos({
+                x: e.clientX,
+                y: e.clientY
+            });
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+
     console.log("Aethel loaded successfully.");
 
     // Retrieve Zustand store states and actions
@@ -76,6 +147,29 @@ export default function App() {
     useEffect(() => {
         initAuth();
     }, [initAuth]);
+
+    // Automatic Migration check to clean up old sleep blocks from database
+    useEffect(() => {
+        if (!entities || entities.length === 0) return;
+        const hasSleepBlock1 = entities.some(e => e.id === 'sleep-block-1');
+        if (hasSleepBlock1) {
+            console.log("Migrating sleep blocks in database...");
+            deleteEntity('sleep-block-1');
+            const sleepBlock2 = entities.find(e => e.id === 'sleep-block-2');
+            if (sleepBlock2) {
+                const updated = {
+                    ...sleepBlock2,
+                    title: 'Sleep & Recovery',
+                    properties: {
+                        ...sleepBlock2.properties,
+                        startHour: 24.0,
+                        endHour: 30.0
+                    }
+                };
+                saveEntity(updated);
+            }
+        }
+    }, [entities, deleteEntity, saveEntity]);
 
     // Keep currentFloatHour updated for Live Marker
     useEffect(() => {
@@ -105,6 +199,11 @@ export default function App() {
             }));
     }, [entities]);
 
+    // 1.5. Continuous Notebook
+    const quickNotesContent = useMemo(() => {
+        return entities.find(e => e.id === 'focus-quick-notes')?.content || '';
+    }, [entities]);
+
     // 2. Custom Columns / Buckets
     const customBucketsMapped = useMemo(() => {
         return entities
@@ -113,6 +212,7 @@ export default function App() {
                 id: e.id,
                 title: e.title,
                 section: e.properties?.section || 'spaces',
+                icon: e.properties?.icon || '',
                 order: e.properties?.order ?? 0
             }));
     }, [entities]);
@@ -174,10 +274,15 @@ export default function App() {
             .filter(e => e.type === 'event')
             .map(e => ({
                 id: e.id,
-                bucket: e.properties?.bucketKey,
-                startHour: e.properties?.startHour,
-                endHour: e.properties?.endHour,
-                name: e.title
+                bucket: e.properties?.bucketKey || 'work',
+                startHour: e.properties?.startHour ?? 9.0,
+                endHour: e.properties?.endHour ?? 10.0,
+                name: e.title,
+                type: e.properties?.type || 'block',
+                date: e.properties?.date || '',
+                completed: e.properties?.completed || false,
+                status: e.properties?.status || '',
+                templateId: e.properties?.templateId || ''
             }));
     }, [entities]);
 
@@ -301,6 +406,14 @@ export default function App() {
         }
     };
 
+    const handleClearArchive = () => {
+        if (confirm("Permanently delete all archived tasks? This action cannot be undone.")) {
+            pushToUndoStack();
+            const archivedTasks = entities.filter(e => e.type === 'task' && e.properties?.status === 'archived');
+            archivedTasks.forEach(t => deleteEntity(t.id));
+        }
+    };
+
     const handleDeleteTask = (id) => {
         if (confirm("Permanently delete this task?")) {
             deleteEntity(id);
@@ -337,6 +450,21 @@ export default function App() {
         }
     };
 
+    const handleUpdateSpaceIcon = (id, icon) => {
+        const e = entities.find(x => x.id === id);
+        if (e && e.properties?.icon !== icon) {
+            pushToUndoStack();
+            saveEntity({
+                ...e,
+                updatedAt: new Date().toISOString(),
+                properties: {
+                    ...e.properties,
+                    icon
+                }
+            });
+        }
+    };
+
     const handleDeleteSpace = (id) => {
         if (confirm("Delete space?")) {
             pushToUndoStack();
@@ -349,17 +477,15 @@ export default function App() {
     // -------------------------------------------------------------
     // Schedule Actions (CRUD Entity wrappers)
     // -------------------------------------------------------------
-    const handleToggleZenItem = (itemId) => {
-        const todayStr = new Date(2026, 5, 16).toISOString().split('T')[0];
-        handleToggleZenItemFromModal(todayStr, itemId);
-    };
-
     const handleToggleZenItemFromModal = (dateStr, itemId) => {
         const id = `checklist-${dateStr}`;
         const existing = entities.find(e => e.id === id);
-        const items = existing
-            ? JSON.parse(JSON.stringify(existing.properties?.items || []))
-            : JSON.parse(JSON.stringify(defaultMorningItems));
+        const savedItems = existing?.properties?.items || [];
+        // Reconcile against current defaults so stale saved items (old ids, renamed/merged habits) don't drop new ones
+        const items = defaultMorningItems.map(def => {
+            const saved = savedItems.find(i => i.id === def.id);
+            return saved ? { ...def, done: saved.done } : { ...def };
+        });
         const item = items.find(i => i.id === itemId);
         if (item) {
             item.done = !item.done;
@@ -405,7 +531,7 @@ export default function App() {
         saveEntity(newEntity);
     };
 
-    const handleMoveScheduleBlock = (blockId, newStart, newEnd) => {
+    const handleMoveScheduleBlock = (blockId, newStart, newEnd, targetDateStr) => {
         const e = entities.find(x => x.id === blockId);
         if (e) {
             saveEntity({
@@ -414,27 +540,87 @@ export default function App() {
                 properties: {
                     ...e.properties,
                     startHour: newStart,
-                    endHour: newEnd
+                    endHour: newEnd,
+                    date: targetDateStr !== undefined ? targetDateStr : e.properties?.date
                 }
             });
         }
     };
 
-    const handleAddNewScheduleBlock = (name, bucketKey) => {
+    const handleAddNewScheduleBlock = (eventData) => {
+        const { name, bucket, type, date, startHour, endHour } = eventData;
         const newBlock = {
             id: 'block-' + Date.now(),
             type: 'event',
-            title: name || bucketsConfig[bucketKey]?.name || 'New Block',
+            title: name || 'New Event',
             content: '',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             properties: {
-                bucketKey,
-                startHour: 12.0,
-                endHour: 13.0
+                bucketKey: bucket || 'work',
+                type: type || 'block',
+                date: date || '',
+                startHour: startHour ?? 9.0,
+                endHour: endHour ?? 10.0,
+                completed: false
             }
         };
         saveEntity(newBlock);
+    };
+
+    const handleUpdateScheduleBlock = (eventData) => {
+        const { id, name, bucket, type, date, startHour, endHour } = eventData;
+        const e = entities.find(x => x.id === id);
+        if (e) {
+            saveEntity({
+                ...e,
+                title: name,
+                updatedAt: new Date().toISOString(),
+                properties: {
+                    ...e.properties,
+                    bucketKey: bucket,
+                    type,
+                    date,
+                    startHour,
+                    endHour
+                }
+            });
+        }
+    };
+
+    const handleDeleteScheduleBlock = (eventId, mode = 'all', dateStr = '') => {
+        if (mode === 'only-this' && dateStr) {
+            // Save a cancelled override event
+            const overrideId = `${eventId}-cancelled-${dateStr}`;
+            const overrideEntity = {
+                id: overrideId,
+                type: 'event',
+                title: 'Cancelled Event Instance',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                properties: {
+                    templateId: eventId,
+                    date: dateStr,
+                    status: 'cancelled'
+                }
+            };
+            saveEntity(overrideEntity);
+        } else {
+            // Delete the template block or event series entirely
+            deleteEntity(eventId);
+        }
+    };
+
+    const handleUpdateQuickNotes = (content) => {
+        const e = entities.find(x => x.id === 'focus-quick-notes');
+        saveEntity({
+            id: 'focus-quick-notes',
+            type: 'note',
+            title: 'Quick Notes',
+            content,
+            createdAt: e ? e.createdAt : new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        });
     };
 
     const handleSaveBudget = (updatedBuckets) => {
@@ -733,78 +919,119 @@ export default function App() {
     const [isBudgetOpen, setIsBudgetOpen] = useState(false);
 
     return (
-        <div className="h-screen flex flex-col antialiased select-none overflow-hidden">
-            {/* Unified Navbar */}
-            <nav className="flex items-center justify-between px-8 py-3.5 bg-charcoal text-white sticky top-0 z-50 shadow-sm shrink-0">
-                <div className="w-1/3 flex items-center justify-start gap-3">
-                    <span className="text-[13px] font-medium" id="current-date-display">
-                        {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-                    </span>
-                    <span
-                        id="cloud-sync-indicator"
-                        className={`text-[10px] text-gray-400 transition-opacity flex items-center gap-1 ${syncing ? 'opacity-100' : 'opacity-0'}`}
-                    >
-                        <i className="fa-solid fa-cloud"></i> Synced
-                    </span>
-                </div>
+        <div className="h-screen flex flex-col antialiased select-none overflow-hidden relative bg-white">
+            {/* SVG Noise/Grain Texture Overlay (Global) */}
+            <div className="absolute inset-0 pointer-events-none opacity-[0.035] z-40 mix-blend-overlay">
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+                    <filter id="noiseFilterGlobal">
+                        <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" stitchTiles="stitch" />
+                    </filter>
+                    <rect width="100%" height="100%" filter="url(#noiseFilterGlobal)" />
+                </svg>
+            </div>
 
-                <div className="w-1/3 flex items-center justify-center gap-2 cursor-pointer group" onClick={() => location.reload()}>
-                    <div className="w-1.5 h-1.5 rounded-full bg-white group-hover:scale-125 transition-transform"></div>
-                    <h1 className="text-[26px] font-caveat font-semibold tracking-wider text-white group-hover:text-gray-200 transition-colors mt-1">
-                        Flow
-                    </h1>
-                </div>
+            {/* Ambient Sunlight Dust Motes (Global Floating Background Layer) */}
+            <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
+                {dustMotes.map((mote) => (
+                    <div
+                        key={mote.id}
+                        className="absolute bottom-0 rounded-full bg-gradient-to-t from-amber-300/50 via-amber-400/40 to-orange-200/20 blur-[1px] animate-dust"
+                        style={{
+                            left: mote.left,
+                            width: mote.size,
+                            height: mote.size,
+                            animationDelay: mote.delay,
+                            animationDuration: mote.duration
+                        }}
+                    />
+                ))}
+            </div>
 
-                <div className="flex gap-6 items-center text-[17px] text-gray-300 w-1/3 justify-end">
-                    {/* Switch View Buttons */}
-                    <div className="flex bg-white/10 p-0.5 rounded-lg border border-white/5 text-xs mr-2">
-                        <button
-                            onClick={() => setActiveView('home')}
-                            className={`px-3 py-1 rounded font-semibold transition-all duration-200 ${activeView === 'home' ? 'bg-white text-charcoal shadow-sm' : 'text-gray-300 hover:text-white'}`}
+            {/* Interactive Mouse Cursor Spotlight Aura (Only on Home) */}
+            {activeView === 'home' && (
+                <div 
+                    className="absolute pointer-events-none rounded-full w-[350px] h-[350px] bg-gradient-to-r from-amber-300/30 via-rose-300/25 to-indigo-300/30 blur-[70px] z-10 transition-transform duration-500 ease-out hidden md:block"
+                    style={{
+                        transform: `translate(${mousePos.x - 175}px, ${mousePos.y - 175}px)`,
+                    }}
+                />
+            )}
+
+            {/* Unified Full-Width Glassmorphic Navbar with Soft Aura Gradient */}
+            {activeView !== 'home' && (
+                <nav className="flex items-center justify-between px-8 py-3.5 bg-gradient-to-r from-rose-100/12 via-amber-100/8 to-indigo-100/12 backdrop-blur-2xl border-b border-stone-200/35 text-stone-700 fixed top-0 left-0 w-full z-50 shadow-sm shrink-0 select-none">
+                    <div className="w-1/3 flex items-center justify-start gap-3">
+                        <span className="text-[10px] font-mono tracking-wider uppercase text-stone-400 font-bold animate-pulse-slow" id="current-date-display">
+                            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} • {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        </span>
+                        <span
+                            id="cloud-sync-indicator"
+                            className={`text-[9px] font-mono tracking-wider uppercase text-stone-450 transition-opacity flex items-center gap-1 ${syncing ? 'opacity-100' : 'opacity-0'}`}
                         >
-                            Home
-                        </button>
-                        <button
-                            onClick={() => setActiveView('board')}
-                            className={`px-3 py-1 rounded font-semibold transition-all duration-200 ${activeView === 'board' ? 'bg-white text-charcoal shadow-sm' : 'text-gray-300 hover:text-white'}`}
-                        >
-                            Board
-                        </button>
-                        <button
-                            onClick={() => setActiveView('schedule')}
-                            className={`px-3 py-1 rounded font-semibold transition-all duration-200 ${activeView === 'schedule' ? 'bg-white text-charcoal shadow-sm' : 'text-gray-300 hover:text-white'}`}
-                        >
-                            Schedule
-                        </button>
+                            <i className="fa-solid fa-cloud"></i> Synced
+                        </span>
                     </div>
 
-                    {/* Undo/Redo Controls */}
-                    <div className="flex gap-4 text-[15px] mr-2 border-r border-white/10 pr-4">
-                        <button 
-                            onClick={handleUndo} 
-                            title="Undo (Ctrl+Z)"
-                            className="hover:text-white transition flex items-center text-gray-300 disabled:opacity-30 disabled:hover:text-gray-300"
-                            disabled={undoStack.length === 0}
-                        >
-                            <i className="fa-solid fa-rotate-left"></i>
-                        </button>
-                        <button 
-                            onClick={handleRedo} 
-                            title="Redo (Ctrl+Y)"
-                            className="hover:text-white transition flex items-center text-gray-300 disabled:opacity-30 disabled:hover:text-gray-300"
-                            disabled={redoStack.length === 0}
-                        >
-                            <i className="fa-solid fa-rotate-right"></i>
-                        </button>
+                    <div className="w-1/3 flex items-center justify-center gap-2.5 cursor-pointer group" onClick={() => setActiveView('home')}>
+                        <div className="w-1.5 h-1.5 rounded-full animate-alive-dot translate-y-[2px] transition-transform duration-300"></div>
+                        <h1 className="text-xl font-cormorant font-normal italic tracking-wide text-stone-850 group-hover:text-stone-600 transition-colors">
+                            aethel
+                        </h1>
                     </div>
 
-                    <button onClick={() => setIsArchiveOpen(true)} title="Archive"><i className="fa-solid fa-box-archive"></i></button>
-                    <button title="Settings"><i className="fa-solid fa-gear"></i></button>
-                </div>
-            </nav>
+                    <div className="flex gap-6 items-center text-[16px] text-stone-450 w-1/3 justify-end">
+                        {/* Switch View Slash Tabs */}
+                        <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-wider mr-2">
+                            <button
+                                onClick={() => setActiveView('home')}
+                                className={`transition-colors duration-205 ${activeView === 'home' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
+                            >
+                                home
+                            </button>
+                            <span className="text-stone-300 select-none">/</span>
+                            <button
+                                onClick={() => setActiveView('board')}
+                                className={`transition-colors duration-205 ${activeView === 'board' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
+                            >
+                                board
+                            </button>
+                            <span className="text-stone-300 select-none">/</span>
+                            <button
+                                onClick={() => setActiveView('schedule')}
+                                className={`transition-colors duration-205 ${activeView === 'schedule' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
+                            >
+                                schedule
+                            </button>
+                        </div>
 
-            {/* Layout Toggling */}
-            <div className="flex-1 flex flex-col overflow-hidden relative">
+                        {/* Undo/Redo Controls */}
+                        <div className="flex gap-4 text-[14px] mr-2 border-r border-stone-200/50 pr-4">
+                            <button 
+                                onClick={handleUndo} 
+                                title="Undo (Ctrl+Z)"
+                                className="hover:text-stone-700 transition flex items-center text-stone-400 disabled:opacity-30 disabled:hover:text-stone-400"
+                                disabled={undoStack.length === 0}
+                            >
+                                <i className="fa-solid fa-rotate-left"></i>
+                            </button>
+                            <button 
+                                onClick={handleRedo} 
+                                title="Redo (Ctrl+Y)"
+                                className="hover:text-stone-700 transition flex items-center text-stone-400 disabled:opacity-30 disabled:hover:text-stone-400"
+                                disabled={redoStack.length === 0}
+                            >
+                                <i className="fa-solid fa-rotate-right"></i>
+                            </button>
+                        </div>
+
+                        <button onClick={() => setIsArchiveOpen(true)} className="hover:text-stone-700 transition" title="Archive"><i className="fa-solid fa-box-archive"></i></button>
+                        <button className="hover:text-stone-700 transition" title="Settings"><i className="fa-solid fa-gear"></i></button>
+                    </div>
+                </nav>
+            )}
+
+            {/* Layout Toggling with Smooth Page Transitions */}
+            <div className="flex-1 flex flex-col overflow-hidden relative animate-page-fade" key={activeView}>
                 {activeView === 'home' && (
                     <HomeView onNavigate={setActiveView} />
                 )}
@@ -812,6 +1039,8 @@ export default function App() {
                     <BoardView
                         tasks={tasksMapped}
                         customBuckets={customBucketsMapped}
+                        notesContent={quickNotesContent}
+                        onUpdateNotes={handleUpdateQuickNotes}
                         dateOffset={dateOffset}
                         timelineDays={timelineDays}
                         onShiftDate={setDateOffset}
@@ -820,6 +1049,7 @@ export default function App() {
                         onCompleteTask={handleCompleteTask}
                         onAddNewSpace={handleAddNewSpace}
                         onUpdateSpaceTitle={handleUpdateSpaceTitle}
+                        onUpdateSpaceIcon={handleUpdateSpaceIcon}
                         onDeleteSpace={handleDeleteSpace}
 
                         onDragStartTask={handleDragStartTask}
@@ -839,30 +1069,24 @@ export default function App() {
                         startupTasks={startupTasksMapped}
                         checklistDatabase={checklistDatabaseMapped}
                         defaultMorningItems={defaultMorningItems}
+                        defaultHabitGroups={defaultHabitGroups}
                         activeBlock={activeBlock}
                         currentFloatHour={currentFloatHour}
                         selectedDate={selectedDate}
                         currentView={currentScheduleView}
                         dailyScheduleTemplate={scheduleBlocksMapped}
-                        onToggleZenItem={handleToggleZenItem}
+                        onToggleZenItem={handleToggleZenItemFromModal}
                         onToggleStartupTask={handleToggleStartupTask}
                         onAddNewStartupTask={handleAddNewStartupTask}
                         onDeleteStartupTask={handleDeleteTask}
                         onResetBudgetDefaultsAndRefresh={handleResetBudgetDefaultsAndRefresh}
                         onMoveScheduleBlock={handleMoveScheduleBlock}
                         onResizeScheduleBlock={handleMoveScheduleBlock}
-                        onDeleteScheduleBlock={deleteEntity}
+                        onDeleteScheduleBlock={handleDeleteScheduleBlock}
                         onAddScheduleBlock={handleAddNewScheduleBlock}
-
-                        onChangeWeek={(dir) => {
-                            setSelectedDate(prev => {
-                                const next = new Date(prev);
-                                const offset = currentScheduleView === 'day' ? 1 : 7;
-                                next.setDate(next.getDate() + dir * offset);
-                                return next;
-                            });
-                        }}
-                        onGoToToday={() => setSelectedDate(new Date(START_DATE))}
+                        onUpdateScheduleBlock={handleUpdateScheduleBlock}
+                        onChangeWeek={setSelectedDate}
+                        onGoToToday={() => setSelectedDate(new Date())}
                         onOpenRoutineModal={(day) => {
                             setRoutineModalDay(day);
                             setIsRoutineOpen(true);
@@ -887,6 +1111,9 @@ export default function App() {
                 }))}
                 onRestore={handleRestoreTask}
                 onDelete={handleDeleteTask}
+                onClearArchive={handleClearArchive}
+                canUndo={undoStack.length > 0}
+                onUndo={handleUndo}
             />
 
             <RoutineModal
@@ -897,7 +1124,7 @@ export default function App() {
                 defaultMorningItems={defaultMorningItems}
                 onToggleZenItem={handleToggleZenItemFromModal}
                 onToggleSkincareDay={() => {
-                    const dateStr = routineModalDay.toISOString().split('T')[0];
+                    const dateStr = routineModalDay.toLocaleDateString('sv-SE');
                     const textEl = document.getElementById('skincare-alt-text');
                     if (textEl) {
                         if (textEl.textContent.includes("Vitamin C")) {

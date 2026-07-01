@@ -11,7 +11,7 @@ export default function RoutineModal({
 }) {
     if (!isOpen) return null;
 
-    const dateStr = day.toISOString().split('T')[0];
+    const dateStr = day.toLocaleDateString('sv-SE');
     const items = checklistDatabase[dateStr] || defaultMorningItems;
     const doneCount = items.filter(i => i.done).length;
     const percent = Math.round((doneCount / items.length) * 100);

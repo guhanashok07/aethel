@@ -1,6 +1,6 @@
-
 body {
-  overflow: hidden; /* Prevent body scroll to let child containers scroll independently */
+  overflow: hidden;
+  /* Prevent body scroll to let child containers scroll independently */
 }
 
 /* Custom Scrollbars */
@@ -48,22 +48,25 @@ body {
 /* Board Card Styling */
 .board-container {
   border-radius: 1rem;
-  background-color: #ffffff;
-  border: 1px solid rgba(0, 0, 0, 0.03);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+  background-color: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(228, 228, 231, 0.5);
+  /* border-stone-200/50 */
+  box-shadow: 0 4px 24px rgba(120, 110, 90, 0.015);
   padding: 16px;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .board-container:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 32px rgba(120, 110, 90, 0.035);
+  border-color: rgba(228, 228, 231, 0.95);
 }
 
 .board-container.drag-over {
-  background-color: #F5F5F5 !important;
-  border-color: #E5E5E5 !important;
-  box-shadow: inset 0 0 0 1px #E5E5E5, 0 6px 20px rgba(0, 0, 0, 0.03) !important;
+  background-color: rgba(255, 255, 255, 0.75) !important;
+  border-color: rgba(228, 228, 231, 0.9) !important;
+  box-shadow: 0 10px 36px rgba(120, 110, 90, 0.05) !important;
   transform: translateY(-2px);
 }
 
@@ -93,18 +96,34 @@ body {
   width: 100%;
   background: transparent;
   border: none;
-  border-bottom: 1px dashed #E5E7EB;
-  padding-bottom: 6px;
+  padding-bottom: 2px;
   font-size: 13.5px;
   line-height: 20px;
   outline: none;
   cursor: text;
 }
 
+/* Hide scrollbar utility */
+.scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Apple-style glassmorphism backdrop filter fallback */
+.backdrop-blur-2xl {
+  -webkit-backdrop-filter: blur(40px) !important;
+  backdrop-filter: blur(40px) !important;
+}
+
 .task-checkbox-wrapper {
   position: absolute;
   right: 8px;
-  top: 8px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
   align-items: center;
 }
@@ -154,43 +173,149 @@ body {
   font-weight: 700 !important;
 }
 
-/* Fluid Aura Animations */
-@keyframes fluid-aura-slow {
+/* Serene Dust Motes Animation */
+@keyframes float-dust {
   0% {
-    transform: translate(0px, 0px) scale(1) rotate(0deg);
+    transform: translateY(105vh) translateX(0) scale(0.8);
+    opacity: 0;
   }
-  33% {
-    transform: translate(80px, -120px) scale(1.3) rotate(90deg);
+
+  15% {
+    opacity: 0.6;
   }
-  66% {
-    transform: translate(-60px, 60px) scale(0.8) rotate(180deg);
+
+  85% {
+    opacity: 0.6;
   }
+
   100% {
-    transform: translate(0px, 0px) scale(1) rotate(360deg);
+    transform: translateY(-5vh) translateX(120px) scale(1.4);
+    opacity: 0;
   }
 }
 
-@keyframes fluid-aura-reverse {
-  0% {
-    transform: translate(0px, 0px) scale(1) rotate(360deg);
-  }
-  33% {
-    transform: translate(-120px, 80px) scale(0.7) rotate(180deg);
-  }
-  66% {
-    transform: translate(60px, -40px) scale(1.2) rotate(90deg);
-  }
+.animate-dust {
+  animation: float-dust 28s infinite linear;
+}
+
+/* Individual Out-of-Phase Aura Breathing Animations */
+@keyframes breathe-coral {
+
+  0%,
   100% {
-    transform: translate(0px, 0px) scale(1) rotate(0deg);
+    opacity: 0.55;
+    transform: scale(0.9) translate(0px, 0px);
+  }
+
+  50% {
+    opacity: 0.95;
+    transform: scale(1.15) translate(40px, -20px);
   }
 }
 
-.animate-aura-slow {
-  animation: fluid-aura-slow 16s infinite alternate ease-in-out;
+@keyframes breathe-indigo {
+
+  0%,
+  100% {
+    opacity: 0.95;
+    transform: scale(1.15) translate(0px, 0px);
+  }
+
+  50% {
+    opacity: 0.55;
+    transform: scale(0.9) translate(-30px, 40px);
+  }
 }
 
-.animate-aura-reverse {
-  animation: fluid-aura-reverse 20s infinite alternate ease-in-out;
+@keyframes breathe-mint {
+
+  0%,
+  100% {
+    opacity: 0.50;
+    transform: scale(0.95) translate(0px, 0px);
+  }
+
+  50% {
+    opacity: 0.90;
+    transform: scale(1.12) translate(30px, 30px);
+  }
+}
+
+@keyframes breathe-gold {
+
+  0%,
+  100% {
+    opacity: 0.90;
+    transform: scale(1.12) translate(0px, 0px);
+  }
+
+  50% {
+    opacity: 0.50;
+    transform: scale(0.95) translate(-40px, -20px);
+  }
+}
+
+.animate-breathe-coral {
+  animation: breathe-coral 12s infinite ease-in-out;
+}
+
+.animate-breathe-indigo {
+  animation: breathe-indigo 14s infinite ease-in-out;
+}
+
+.animate-breathe-mint {
+  animation: breathe-mint 16s infinite ease-in-out;
+}
+
+.animate-breathe-gold {
+  animation: breathe-gold 13s infinite ease-in-out;
+}
+
+/* Slow Spin Rotation for Circular Time-Ring */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 50s linear infinite;
+}
+
+@keyframes float-gentle {
+
+  0%,
+  100% {
+    transform: translateY(0px);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float-gentle {
+  animation: float-gentle 4s infinite ease-in-out;
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-fade {
+  animation: page-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .glass-card {
@@ -209,3 +334,54 @@ body {
   transform: translateY(-2px);
 }
 
+/* Alive indicator dot breathing & color shifting keyframes */
+@keyframes alive-dot-pulse {
+
+  0%,
+  100% {
+    transform: scale(0.92);
+    background-color: rgba(244, 180, 180, 0.45);
+    /* Soft Muted Coral */
+    box-shadow: 0 0 4px rgba(244, 180, 180, 0.25);
+  }
+
+  33% {
+    transform: scale(1.12);
+    background-color: rgba(245, 222, 179, 0.45);
+    /* Soft Muted Gold/Wheat */
+    box-shadow: 0 0 6px rgba(245, 222, 179, 0.25);
+  }
+
+  66% {
+    transform: scale(0.92);
+    background-color: rgba(180, 188, 218, 0.45);
+    /* Soft Muted Indigo/Grey-blue */
+    box-shadow: 0 0 4px rgba(180, 188, 218, 0.25);
+  }
+}
+
+.animate-alive-dot {
+  animation: alive-dot-pulse 5s infinite ease-in-out;
+}
+
+/* Notebook formatting and placeholder rules */
+.notebook-editable.is-empty:not(:focus)::before {
+  content: attr(placeholder);
+  color: rgba(120, 113, 108, 0.4);
+  font-style: italic;
+  pointer-events: none;
+}
+
+.notebook-editable ul {
+  list-style-type: disc;
+  padding-left: 1.25rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}
+
+.notebook-editable ol {
+  list-style-type: decimal;
+  padding-left: 1.25rem;
+  margin-top: 0.25rem;
+  margin-bottom: 0.25rem;
+}

@@ -25,7 +25,6 @@ const defaultBucketsConfig = {
 };
 
 const defaultScheduleTemplate = [
-    { id: "sleep-block-1", bucket: "sleep", startHour: 2.0, endHour: 6.0, name: "Deep Sleep & Recovery" },
     { id: "morning-routine-block", bucket: "routine", startHour: 6.0, endHour: 7.5, name: "Morning Routine" },
     { id: "work-block-1", bucket: "work", startHour: 7.5, endHour: 11.5, name: "Internship & Research: Core Depth" },
     { id: "lunch-block", bucket: "routine", startHour: 11.5, endHour: 12.0, name: "Mindful Lunch" },
@@ -37,7 +36,7 @@ const defaultScheduleTemplate = [
     { id: "career-block", bucket: "work", startHour: 20.0, endHour: 21.0, name: "Career Work: Resume & Outreach" },
     { id: "build-block", bucket: "startup", startHour: 21.0, endHour: 23.0, name: "Own Startup: MVP Code" },
     { id: "learning-block", bucket: "work", startHour: 23.0, endHour: 24.0, name: "Technical L&D (Systems)" },
-    { id: "sleep-block-2", bucket: "sleep", startHour: 24.0, endHour: 26.0, name: "Night Rest & Sleep" }
+    { id: "sleep-block-2", bucket: "sleep", startHour: 24.0, endHour: 30.0, name: "Sleep & Recovery" }
 ];
 
 export const useStore = create((set, get) => ({
@@ -45,7 +44,7 @@ export const useStore = create((set, get) => ({
     currentUser: null,
     entities: [],
     relations: [],
-    selectedDate: new Date(2026, 5, 16),
+    selectedDate: new Date(),
     currentFloatHour: 0,
     currentScheduleView: 'week',
     syncing: false,

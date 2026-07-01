@@ -58,7 +58,7 @@ export default function TaskCard({ task, onDragStart, onDragEnd, onUpdateText, o
     return (
         <div
             id={task.id}
-            className="task-card group p-2 bg-[#ffffff] border border-black/5 hover:border-black/10 transition-all mb-1"
+            className="task-card group p-2.5 bg-white/95 border border-stone-200/50 hover:border-stone-400/30 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 mb-1.5"
             draggable={true}
             onDragStart={(e) => onDragStart(e, task.id)}
             onDragEnd={onDragEnd}
