@@ -6,6 +6,7 @@ import BoardView from './components/BoardView';
 import ScheduleView from './components/ScheduleView';
 import HomeView from './components/HomeView';
 import NotebookView from './components/NotebookView';
+import VaultView from './components/VaultView';
 import ArchiveModal from './components/ArchiveModal';
 import RoutineModal from './components/RoutineModal';
 import BudgetModal from './components/BudgetModal';
@@ -300,6 +301,23 @@ export default function App() {
                 if (a.order !== b.order) return a.order - b.order;
                 return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
             });
+    }, [entities]);
+
+    // 1.7. Vault — Bookmarks knowledge-graph nodes
+    const bookmarkNodesMapped = useMemo(() => {
+        return entities
+            .filter(e => e.type === 'bookmark_node')
+            .map(e => ({
+                id: e.id,
+                title: e.title || 'Untitled',
+                parentId: e.properties?.parentId || '',
+                kind: e.properties?.kind === 'link' ? 'link' : 'connector',
+                url: e.properties?.url || '',
+                order: e.properties?.order ?? 0,
+                collapsed: !!e.properties?.collapsed,
+                createdAt: e.createdAt,
+                updatedAt: e.updatedAt
+            }));
     }, [entities]);
 
     // 2. Custom Columns / Buckets
@@ -851,6 +869,66 @@ export default function App() {
         deleteEntity(id);
     };
 
+    // -------------------------------------------------------------
+    // Vault — Bookmarks knowledge-graph Actions (CRUD Entity wrappers)
+    // -------------------------------------------------------------
+    const handleAddBookmarkNode = (parentId, { title, kind, url }) => {
+        pushToUndoStack();
+        const id = 'bmk-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+        const now = new Date().toISOString();
+        const siblingCount = entities.filter(e =>
+            e.type === 'bookmark_node' && (e.properties?.parentId || '') === (parentId || '')
+        ).length;
+
+        saveEntity({
+            id,
+            type: 'bookmark_node',
+            title: title || (kind === 'link' ? 'New Link' : 'New Folder'),
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                parentId: parentId || '',
+                kind: kind === 'link' ? 'link' : 'connector',
+                url: kind === 'link' ? (url || '') : '',
+                order: siblingCount,
+                collapsed: false
+            }
+        });
+        return id;
+    };
+
+    const handleUpdateBookmarkNode = (id, updates) => {
+        const e = entities.find(x => x.id === id);
+        if (!e) return;
+
+        saveEntity({
+            ...e,
+            title: updates.title !== undefined ? updates.title : e.title,
+            updatedAt: new Date().toISOString(),
+            properties: {
+                ...e.properties,
+                ...(updates.kind !== undefined ? { kind: updates.kind } : {}),
+                ...(updates.url !== undefined ? { url: updates.url } : {}),
+                ...(updates.collapsed !== undefined ? { collapsed: updates.collapsed } : {}),
+                ...(updates.order !== undefined ? { order: updates.order } : {}),
+                ...(updates.parentId !== undefined ? { parentId: updates.parentId } : {})
+            }
+        });
+    };
+
+    const handleDeleteBookmarkNode = (id) => {
+        pushToUndoStack();
+        const all = entities.filter(e => e.type === 'bookmark_node');
+        const toDelete = [id];
+        let frontier = [id];
+        while (frontier.length) {
+            const kids = all.filter(e => frontier.includes(e.properties?.parentId)).map(e => e.id);
+            toDelete.push(...kids);
+            frontier = kids;
+        }
+        toDelete.forEach(nodeId => deleteEntity(nodeId));
+    };
+
     const handleSaveBudget = (updatedBuckets) => {
         pushToUndoStack();
         let startCursor = 2.0;
@@ -1264,6 +1342,13 @@ export default function App() {
                             >
                                 notebook
                             </button>
+                            <span className="text-stone-300 select-none">/</span>
+                            <button
+                                onClick={() => setActiveView('vault')}
+                                className={`transition-colors duration-205 ${activeView === 'vault' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
+                            >
+                                vault
+                            </button>
                         </div>
 
                         {/* Undo/Redo Controls */}
@@ -1382,6 +1467,14 @@ export default function App() {
                         onAddPage={handleAddNotebookNote}
                         onUpdatePage={handleUpdateNotebookNote}
                         onDeletePage={handleDeleteNotebookNote}
+                    />
+                )}
+                {activeView === 'vault' && (
+                    <VaultView
+                        bookmarkNodes={bookmarkNodesMapped}
+                        onAddBookmark={handleAddBookmarkNode}
+                        onUpdateBookmark={handleUpdateBookmarkNode}
+                        onDeleteBookmark={handleDeleteBookmarkNode}
                     />
                 )}
             </div>

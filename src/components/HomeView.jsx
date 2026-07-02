@@ -93,7 +93,7 @@ export default function HomeView({ onNavigate }) {
 
                     <span className="text-stone-300 font-light text-xl select-none font-cormorant">/</span>
                     
-                    <button 
+                    <button
                         onClick={() => onNavigate('notebook')}
                         className="font-cormorant font-normal italic text-2xl md:text-3xl text-stone-400 hover:text-stone-900 tracking-wider relative group py-1 transition-colors duration-300"
                     >
@@ -102,8 +102,18 @@ export default function HomeView({ onNavigate }) {
                     </button>
 
                     <span className="text-stone-300 font-light text-xl select-none font-cormorant">/</span>
-                    
-                    <button 
+
+                    <button
+                        onClick={() => onNavigate('vault')}
+                        className="font-cormorant font-normal italic text-2xl md:text-3xl text-stone-400 hover:text-stone-900 tracking-wider relative group py-1 transition-colors duration-300"
+                    >
+                        vault
+                        <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-stone-900 transition-all duration-300 group-hover:w-full"></span>
+                    </button>
+
+                    <span className="text-stone-300 font-light text-xl select-none font-cormorant">/</span>
+
+                    <button
                         className="font-cormorant font-normal italic text-2xl md:text-3xl text-stone-300/60 hover:text-stone-400/80 tracking-wider relative cursor-not-allowed py-1 transition-colors duration-300"
                         title="Reading (Coming Soon)"
                     >
