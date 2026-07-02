@@ -5,6 +5,7 @@ import { useStore } from './store/useStore';
 import BoardView from './components/BoardView';
 import ScheduleView from './components/ScheduleView';
 import HomeView from './components/HomeView';
+import NotebookView from './components/NotebookView';
 import ArchiveModal from './components/ArchiveModal';
 import RoutineModal from './components/RoutineModal';
 import BudgetModal from './components/BudgetModal';
@@ -16,11 +17,19 @@ const defaultHabitGroups = [
         label: 'Morning Routine',
         icon: '☀️',
         items: [
-            { id: 'exercise', label: 'Quick exercise', done: false },
             { id: 'water_am', label: 'Water', done: false },
             { id: 'skincare_vitc', label: 'Skin care — Vitamin C / Niacinamide', done: false },
             { id: 'skincare_moist', label: 'Skin care — Moisturizer & sunscreen', done: false },
             { id: 'supplements', label: 'Supplements — Finasteride, Seeds, Gummies & Fish oil', done: false },
+        ]
+    },
+    {
+        id: 'health',
+        label: 'Health',
+        icon: '❤️',
+        items: [
+            { id: 'morning_exercise', label: 'Morning exercise / jogging', done: false },
+            { id: 'gym', label: 'Gym', done: false }
         ]
     },
     {
@@ -46,6 +55,7 @@ const defaultHabitGroups = [
             { id: 'job_work', label: 'Job work — applications, interviews, networking', done: false },
             { id: 'tech_ld', label: 'Technical L&D', done: false },
             { id: 'vocab_comm', label: 'Vocab & communication', done: false },
+            { id: 'startup_work', label: 'Startup Work', done: false },
         ]
     },
     {
@@ -73,19 +83,18 @@ const defaultBucketsConfig = {
 };
 
 const defaultScheduleTemplate = [
-    { id: "sleep-block-1", bucket: "sleep", startHour: 2.0, endHour: 6.0, name: "Deep Sleep & Recovery" },
-    { id: "morning-routine-block", bucket: "routine", startHour: 6.0, endHour: 7.5, name: "Morning Routine" },
-    { id: "work-block-1", bucket: "work", startHour: 7.5, endHour: 11.5, name: "Internship & Research: Core Depth" },
-    { id: "lunch-block", bucket: "routine", startHour: 11.5, endHour: 12.0, name: "Mindful Lunch" },
-    { id: "work-block-2", bucket: "work", startHour: 12.0, endHour: 15.0, name: "Internship & Research: Execution" },
-    { id: "misc-block", bucket: "margin", startHour: 15.0, endHour: 16.0, name: "Email Chores & Margin" },
-    { id: "gym-block", bucket: "fitness", startHour: 16.0, endHour: 17.5, name: "Movement: Gym & Workout" },
-    { id: "cook-dinner-block", bucket: "routine", startHour: 17.5, endHour: 19.5, name: "Kitchen Prep & Cooking" },
-    { id: "eat-dinner-block", bucket: "routine", startHour: 19.5, endHour: 20.0, name: "Dinner Window" },
-    { id: "career-block", bucket: "work", startHour: 20.0, endHour: 21.0, name: "Career Work: Resume & Outreach" },
-    { id: "build-block", bucket: "startup", startHour: 21.0, endHour: 23.0, name: "Own Startup: MVP Code" },
-    { id: "learning-block", bucket: "work", startHour: 23.0, endHour: 24.0, name: "Technical L&D (Systems)" },
-    { id: "sleep-block-2", bucket: "sleep", startHour: 24.0, endHour: 26.0, name: "Night Rest & Sleep" }
+    { id: "sleep-block-new", bucket: "sleep", startHour: 24.0, endHour: 30.0, name: "Sleep & Recovery" },
+    { id: "job-search-block", bucket: "work", startHour: 6.0, endHour: 7.0, name: "Job Search Work" },
+    { id: "morning-routine-block", bucket: "routine", startHour: 7.0, endHour: 8.5, name: "Morning Routine + Breakfast" },
+    { id: "internship-block", bucket: "work", startHour: 8.5, endHour: 12.5, name: "Internship / AGAI Research Work" },
+    { id: "lunch-block", bucket: "routine", startHour: 12.5, endHour: 13.0, name: "Lunch" },
+    { id: "rd-block", bucket: "work", startHour: 13.0, endHour: 15.5, name: "Product / Technical R&D" },
+    { id: "gym-block", bucket: "fitness", startHour: 16.0, endHour: 17.0, name: "Gym" },
+    { id: "snacks-misc-block", bucket: "margin", startHour: 17.0, endHour: 18.0, name: "Quick Snacks, Misc Work" },
+    { id: "startup-block", bucket: "startup", startHour: 18.0, endHour: 20.0, name: "Building / Startup Work" },
+    { id: "portfolio-block", bucket: "work", startHour: 20.0, endHour: 21.0, name: "Portfolio" },
+    { id: "pending-work-block", bucket: "work", startHour: 21.5, endHour: 23.0, name: "Day's Pending Work" },
+    { id: "night-routine-block", bucket: "routine", startHour: 23.0, endHour: 24.0, name: "Preparing for Next Day + Night Routine" }
 ];
 
 const START_DATE = new Date(); // Current system time
@@ -143,31 +152,44 @@ export default function App() {
         pushToUndoStack
     } = useStore();
 
+    const openSchedule = () => {
+        setCurrentScheduleView('day');
+        setActiveView('schedule');
+    };
+
     // Init Auth on mount
     useEffect(() => {
         initAuth();
     }, [initAuth]);
 
-    // Automatic Migration check to clean up old sleep blocks from database
+    // Automatic Migration check to clean up old schedule blocks from database and apply the new design
     useEffect(() => {
         if (!entities || entities.length === 0) return;
-        const hasSleepBlock1 = entities.some(e => e.id === 'sleep-block-1');
-        if (hasSleepBlock1) {
-            console.log("Migrating sleep blocks in database...");
-            deleteEntity('sleep-block-1');
-            const sleepBlock2 = entities.find(e => e.id === 'sleep-block-2');
-            if (sleepBlock2) {
-                const updated = {
-                    ...sleepBlock2,
-                    title: 'Sleep & Recovery',
+
+        const oldBlockIds = ['sleep-block-1', 'sleep-block-2', 'work-block-1', 'work-block-2', 'cook-dinner-block', 'eat-dinner-block', 'career-block', 'build-block', 'learning-block', 'misc-block'];
+        const hasOldBlocks = entities.some(e => oldBlockIds.includes(e.id));
+
+        if (hasOldBlocks) {
+            console.log("Migrating database schedule to the new design...");
+            oldBlockIds.forEach(id => {
+                deleteEntity(id);
+            });
+            deleteEntity('morning-routine-block');
+
+            defaultScheduleTemplate.forEach((block) => {
+                saveEntity({
+                    id: block.id,
+                    type: 'event',
+                    title: block.name,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
                     properties: {
-                        ...sleepBlock2.properties,
-                        startHour: 24.0,
-                        endHour: 30.0
+                        bucketKey: block.bucket,
+                        startHour: block.startHour,
+                        endHour: block.endHour
                     }
-                };
-                saveEntity(updated);
-            }
+                });
+            });
         }
     }, [entities, deleteEntity, saveEntity]);
 
@@ -204,6 +226,19 @@ export default function App() {
         return entities.find(e => e.id === 'focus-quick-notes')?.content || '';
     }, [entities]);
 
+    // 1.6. Notebook pages
+    const notebookNotesMapped = useMemo(() => {
+        return entities
+            .filter(e => e.type === 'note' && e.properties?.notebook === true)
+            .map(e => ({
+                id: e.id,
+                title: e.title || 'Untitled Note',
+                content: e.content || '',
+                createdAt: e.createdAt,
+                updatedAt: e.updatedAt
+            }));
+    }, [entities]);
+
     // 2. Custom Columns / Buckets
     const customBucketsMapped = useMemo(() => {
         return entities
@@ -223,27 +258,62 @@ export default function App() {
         return configEntity?.properties?.buckets || defaultBucketsConfig;
     }, [entities]);
 
-    // 4. Reactive Allocation Buckets (sums block times dynamically)
+    // 7. Schedule blocks
+    const scheduleBlocksMapped = useMemo(() => {
+        return entities
+            .filter(e => e.type === 'event')
+            .map(e => ({
+                id: e.id,
+                bucket: e.properties?.bucketKey || 'work',
+                startHour: e.properties?.startHour ?? 9.0,
+                endHour: e.properties?.endHour ?? 10.0,
+                name: e.title,
+                type: e.properties?.type || 'block',
+                date: e.properties?.date || '',
+                completed: e.properties?.completed || false,
+                status: e.properties?.status || '',
+                templateId: e.properties?.templateId || ''
+            }));
+    }, [entities]);
+
+    // 4. Reactive Allocation Buckets (sums block times dynamically for the selected date)
     const computedBuckets = useMemo(() => {
         const copy = JSON.parse(JSON.stringify(bucketsConfig));
         // Reset all hours to 0
         Object.keys(copy).forEach(k => {
             copy[k].hours = 0;
         });
-        // Sum from active blocks
-        const blocks = entities.filter(e => e.type === 'event');
-        blocks.forEach(block => {
-            const bucketKey = block.properties?.bucketKey;
+
+        // Get events active on the selectedDate
+        const dateStr = selectedDate.toLocaleDateString('sv-SE');
+        const dateObj = new Date(dateStr + 'T00:00:00');
+        const dayOfWeek = dateObj.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const limitDate = new Date('2026-08-14T23:59:59');
+        const isPastLimit = dateObj > limitDate;
+
+        const specific = scheduleBlocksMapped.filter(e => e.date === dateStr);
+        const templates = (isWeekend || isPastLimit) ? [] : scheduleBlocksMapped.filter(e => !e.date);
+
+        const cancelledIds = specific.filter(e => e.status === 'cancelled').map(e => e.templateId);
+        const activeTemplates = templates.filter(e => !cancelledIds.includes(e.id));
+        const activeSpecific = specific.filter(e => e.status !== 'cancelled');
+
+        const activeBlocks = [...activeSpecific, ...activeTemplates];
+
+        activeBlocks.forEach(block => {
+            const bucketKey = block.bucket;
             if (copy[bucketKey]) {
-                copy[bucketKey].hours += (block.properties?.endHour - block.properties?.startHour);
+                copy[bucketKey].hours += (block.endHour - block.startHour);
             }
         });
+
         // Round
         Object.keys(copy).forEach(k => {
             copy[k].hours = parseFloat(copy[k].hours.toFixed(1));
         });
         return copy;
-    }, [entities, bucketsConfig]);
+    }, [selectedDate, scheduleBlocksMapped, bucketsConfig]);
 
     // 5. Startup Tasks
     const startupTasksMapped = useMemo(() => {
@@ -268,33 +338,28 @@ export default function App() {
         return db;
     }, [entities]);
 
-    // 7. Schedule blocks
-    const scheduleBlocksMapped = useMemo(() => {
-        return entities
-            .filter(e => e.type === 'event')
-            .map(e => ({
-                id: e.id,
-                bucket: e.properties?.bucketKey || 'work',
-                startHour: e.properties?.startHour ?? 9.0,
-                endHour: e.properties?.endHour ?? 10.0,
-                name: e.title,
-                type: e.properties?.type || 'block',
-                date: e.properties?.date || '',
-                completed: e.properties?.completed || false,
-                status: e.properties?.status || '',
-                templateId: e.properties?.templateId || ''
-            }));
-    }, [entities]);
-
     // Compute currently active block for zen focus card
     const activeBlock = useMemo(() => {
+        const today = new Date();
+        const dayOfWeek = today.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const limitDate = new Date('2026-08-14T23:59:59');
+        const isPastLimit = today > limitDate;
+
         let adjustedHour = currentFloatHour;
         if (adjustedHour < 2.0) {
             adjustedHour += 24.0;
         }
-        let active = scheduleBlocksMapped.find(b => adjustedHour >= b.startHour && adjustedHour < b.endHour);
+
+        const todayStr = today.toLocaleDateString('sv-SE');
+        const specific = scheduleBlocksMapped.filter(b => b.date === todayStr);
+        const templates = (isWeekend || isPastLimit) ? [] : scheduleBlocksMapped.filter(b => !b.date);
+
+        const merged = [...specific, ...templates];
+        let active = merged.find(b => adjustedHour >= b.startHour && adjustedHour < b.endHour);
+
         if (!active) {
-            active = scheduleBlocksMapped[0] || { id: 'fallback', bucket: 'sleep', startHour: 2.0, endHour: 6.0, name: 'Deep Sleep' };
+            active = { id: 'fallback', bucket: 'sleep', startHour: 24.0, endHour: 30.0, name: 'Sleep & Recovery' };
         }
         return active;
     }, [scheduleBlocksMapped, currentFloatHour]);
@@ -320,7 +385,7 @@ export default function App() {
         const day = current.getDay();
         const diff = current.getDate() - day + (day === 0 ? -6 : 1);
         const monday = new Date(current.setDate(diff));
-        
+
         const days = [];
         for (let i = 0; i < 7; i++) {
             days.push(new Date(monday));
@@ -623,6 +688,50 @@ export default function App() {
         });
     };
 
+    const handleAddNotebookNote = () => {
+        pushToUndoStack();
+        const id = 'note-' + Date.now();
+        const now = new Date().toISOString();
+        saveEntity({
+            id,
+            type: 'note',
+            title: 'Untitled Note',
+            content: '',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                notebook: true,
+                pinned: false
+            }
+        });
+        return id;
+    };
+
+    const handleUpdateNotebookNote = (id, updates) => {
+        const e = entities.find(x => x.id === id);
+        if (!e) return;
+
+        const nextTitle = updates.title !== undefined ? updates.title : e.title;
+        const nextContent = updates.content !== undefined ? updates.content : e.content;
+        if (nextTitle === e.title && nextContent === e.content) return;
+
+        saveEntity({
+            ...e,
+            title: nextTitle,
+            content: nextContent,
+            updatedAt: new Date().toISOString(),
+            properties: {
+                ...e.properties,
+                notebook: true
+            }
+        });
+    };
+
+    const handleDeleteNotebookNote = (id) => {
+        pushToUndoStack();
+        deleteEntity(id);
+    };
+
     const handleSaveBudget = (updatedBuckets) => {
         pushToUndoStack();
         let startCursor = 2.0;
@@ -726,7 +835,7 @@ export default function App() {
     const handleDragStartTask = (ev, taskId) => {
         ev.stopPropagation();
         setDraggedTaskId(taskId);
-        
+
         const draggedDOM = document.getElementById(taskId);
         if (draggedDOM) {
             originalParentRef.current = draggedDOM.parentElement;
@@ -738,7 +847,7 @@ export default function App() {
     const handleDragEndTask = (ev) => {
         ev.currentTarget.classList.remove('dragging');
         const draggedDOM = document.getElementById(draggedTaskId);
-        
+
         // Gather order updates from DOM structure
         const updates = [];
         document.querySelectorAll('.board-column').forEach(col => {
@@ -760,7 +869,7 @@ export default function App() {
                 originalParentRef.current.appendChild(draggedDOM);
             }
         }
-        
+
         originalParentRef.current = null;
         originalSiblingRef.current = null;
         setDraggedTaskId(null);
@@ -854,7 +963,7 @@ export default function App() {
 
         const containerId = bucket.properties?.section === 'focus' ? 'focus-boards' : 'custom-boards';
         const boards = document.getElementById(containerId).querySelectorAll('.board-container[data-bucket]');
-        
+
         let changed = false;
         boards.forEach((b, i) => {
             const bucketId = b.getAttribute('data-bucket');
@@ -890,6 +999,8 @@ export default function App() {
             document.body.style.backgroundColor = '#FAF8F5';
         } else if (activeView === 'board') {
             document.body.style.backgroundColor = '#FDFDFC';
+        } else if (activeView === 'notebook') {
+            document.body.style.backgroundColor = '#fbfaf8';
         } else {
             document.body.style.backgroundColor = '#fdfbfa';
         }
@@ -949,7 +1060,7 @@ export default function App() {
 
             {/* Interactive Mouse Cursor Spotlight Aura (Only on Home) */}
             {activeView === 'home' && (
-                <div 
+                <div
                     className="absolute pointer-events-none rounded-full w-[350px] h-[350px] bg-gradient-to-r from-amber-300/30 via-rose-300/25 to-indigo-300/30 blur-[70px] z-10 transition-transform duration-500 ease-out hidden md:block"
                     style={{
                         transform: `translate(${mousePos.x - 175}px, ${mousePos.y - 175}px)`,
@@ -997,25 +1108,32 @@ export default function App() {
                             </button>
                             <span className="text-stone-300 select-none">/</span>
                             <button
-                                onClick={() => setActiveView('schedule')}
+                                onClick={openSchedule}
                                 className={`transition-colors duration-205 ${activeView === 'schedule' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
                             >
                                 schedule
+                            </button>
+                            <span className="text-stone-300 select-none">/</span>
+                            <button
+                                onClick={() => setActiveView('notebook')}
+                                className={`transition-colors duration-205 ${activeView === 'notebook' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
+                            >
+                                notebook
                             </button>
                         </div>
 
                         {/* Undo/Redo Controls */}
                         <div className="flex gap-4 text-[14px] mr-2 border-r border-stone-200/50 pr-4">
-                            <button 
-                                onClick={handleUndo} 
+                            <button
+                                onClick={handleUndo}
                                 title="Undo (Ctrl+Z)"
                                 className="hover:text-stone-700 transition flex items-center text-stone-400 disabled:opacity-30 disabled:hover:text-stone-400"
                                 disabled={undoStack.length === 0}
                             >
                                 <i className="fa-solid fa-rotate-left"></i>
                             </button>
-                            <button 
-                                onClick={handleRedo} 
+                            <button
+                                onClick={handleRedo}
                                 title="Redo (Ctrl+Y)"
                                 className="hover:text-stone-700 transition flex items-center text-stone-400 disabled:opacity-30 disabled:hover:text-stone-400"
                                 disabled={redoStack.length === 0}
@@ -1033,7 +1151,13 @@ export default function App() {
             {/* Layout Toggling with Smooth Page Transitions */}
             <div className="flex-1 flex flex-col overflow-hidden relative animate-page-fade" key={activeView}>
                 {activeView === 'home' && (
-                    <HomeView onNavigate={setActiveView} />
+                    <HomeView onNavigate={(view) => {
+                        if (view === 'schedule') {
+                            openSchedule();
+                            return;
+                        }
+                        setActiveView(view);
+                    }} />
                 )}
                 {activeView === 'board' && (
                     <BoardView
@@ -1056,11 +1180,11 @@ export default function App() {
                         onDragEndTask={handleDragEndTask}
                         onDragOverColumn={handleDragOverColumn}
                         onDragLeaveColumn={handleDragLeaveColumn}
-                        onDropOnColumn={() => {}}
+                        onDropOnColumn={() => { }}
                         onDragBucketStart={handleDragBucketStart}
                         onDragBucketEnd={handleDragBucketEnd}
                         onDragBucketOver={handleDragBucketOver}
-                        onDragBucketDrop={() => {}}
+                        onDragBucketDrop={() => { }}
                     />
                 )}
                 {activeView === 'schedule' && (
@@ -1096,6 +1220,14 @@ export default function App() {
                         getWeekDays={getWeekDays}
                         formatHour={formatHour}
                         setView={setCurrentScheduleView}
+                    />
+                )}
+                {activeView === 'notebook' && (
+                    <NotebookView
+                        notes={notebookNotesMapped}
+                        onAddNote={handleAddNotebookNote}
+                        onUpdateNote={handleUpdateNotebookNote}
+                        onDeleteNote={handleDeleteNotebookNote}
                     />
                 )}
             </div>

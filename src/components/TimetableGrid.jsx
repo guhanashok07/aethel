@@ -148,8 +148,14 @@ export default function TimetableGrid({
 
     // Filter events based on active category toggle and selected date
     const getEventsForDate = (dateStr) => {
+        const dateObj = new Date(dateStr + 'T00:00:00');
+        const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 6 is Saturday
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const limitDate = new Date('2026-08-14T23:59:59');
+        const isPastLimit = dateObj > limitDate;
+
         const specific = dailyScheduleTemplate.filter(e => e.date === dateStr);
-        const templates = dailyScheduleTemplate.filter(e => !e.date);
+        const templates = (isWeekend || isPastLimit) ? [] : dailyScheduleTemplate.filter(e => !e.date);
 
         // Filter out templates that have a specific override marked as 'cancelled'
         const cancelledIds = specific.filter(e => e.status === 'cancelled').map(e => e.templateId);
@@ -347,6 +353,98 @@ export default function TimetableGrid({
                             )}
                         </div>
                     </div>
+
+                    {/* Time Allocation Breakdown Section */}
+                    {(() => {
+                        const getCategoryDetails = (event) => {
+                            const name = event.name || '';
+                            const bucket = event.bucket || '';
+                            const lowerName = name.toLowerCase();
+                            
+                            if (
+                                lowerName.includes('job search') ||
+                                lowerName.includes('internship') ||
+                                lowerName.includes('agai') ||
+                                lowerName.includes('research') ||
+                                lowerName.includes('r&d') ||
+                                lowerName.includes('startup') ||
+                                lowerName.includes('portfolio')
+                            ) {
+                                return 'career';
+                            }
+                            if (
+                                lowerName.includes('morning routine') ||
+                                lowerName.includes('snacks') ||
+                                lowerName.includes('night routine') ||
+                                lowerName.includes('preparing')
+                            ) {
+                                return 'personal';
+                            }
+                            if (
+                                lowerName.includes('pending work') ||
+                                lowerName.includes('commute')
+                            ) {
+                                return 'misc';
+                            }
+                            if (
+                                lowerName.includes('lunch') ||
+                                lowerName.includes('gym') ||
+                                lowerName.includes('sleep') ||
+                                bucket === 'sleep' ||
+                                bucket === 'fitness'
+                            ) {
+                                return 'health';
+                            }
+                            
+                            if (bucket === 'work' || bucket === 'startup') return 'career';
+                            if (bucket === 'routine') return 'personal';
+                            return 'misc';
+                        };
+
+                        const allocation = { career: 0, personal: 0, misc: 0, health: 0 };
+                        activeTimeBlocks.forEach(ev => {
+                            const cat = getCategoryDetails(ev);
+                            const hrs = ev.endHour - ev.startHour;
+                            if (hrs > 0) {
+                                allocation[cat] += hrs;
+                            }
+                        });
+
+                        const allocatedTotal = allocation.career + allocation.personal + allocation.misc + allocation.health;
+                        const unallocated = Math.max(0, 24 - allocatedTotal);
+                        allocation.misc += unallocated;
+
+                        const formatHrs = (h) => {
+                            if (h === 0) return '0 hrs';
+                            const hoursPart = Math.floor(h);
+                            const minsPart = Math.round((h % 1) * 60);
+                            if (minsPart === 0) return `${hoursPart} ${hoursPart === 1 ? 'hr' : 'hrs'}`;
+                            return `${hoursPart}h ${minsPart}m`;
+                        };
+
+                        const displayCategories = [
+                            { id: 'career', label: 'Career & Academics', hours: allocation.career, dotColor: 'bg-rose-400/80' },
+                            { id: 'personal', label: 'Personal & Chores', hours: allocation.personal, dotColor: 'bg-indigo-400/80' },
+                            { id: 'misc', label: 'Misc', hours: allocation.misc, dotColor: 'bg-amber-400/80' },
+                            { id: 'health', label: 'Sleep & Health', hours: allocation.health, dotColor: 'bg-emerald-400/80' }
+                        ];
+
+                        return (
+                            <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between border-t border-stone-200/40 pt-4 gap-3 text-[10px] font-mono tracking-wider uppercase text-stone-400 select-none animate-page-fade">
+                                <div className="flex flex-wrap gap-x-5 gap-y-2">
+                                    {displayCategories.map(cat => (
+                                        <span key={cat.id} className="flex items-center gap-1.5 hover:text-stone-700 transition-colors">
+                                            <span className={`w-1.5 h-1.5 rounded-full ${cat.dotColor}`} />
+                                            {cat.label}: <span className="font-semibold text-stone-600">{formatHrs(cat.hours)}</span>
+                                        </span>
+                                    ))}
+                                </div>
+                                <span className="shrink-0 text-stone-500 font-bold bg-stone-100/70 px-2.5 py-0.5 rounded-full self-start sm:self-auto">
+                                    Total: {formatHrs(allocation.career + allocation.personal + allocation.misc + allocation.health)}
+                                </span>
+                            </div>
+                        );
+                    })()}
                 </div>
             </div>
         );

@@ -25,18 +25,18 @@ const defaultBucketsConfig = {
 };
 
 const defaultScheduleTemplate = [
-    { id: "morning-routine-block", bucket: "routine", startHour: 6.0, endHour: 7.5, name: "Morning Routine" },
-    { id: "work-block-1", bucket: "work", startHour: 7.5, endHour: 11.5, name: "Internship & Research: Core Depth" },
-    { id: "lunch-block", bucket: "routine", startHour: 11.5, endHour: 12.0, name: "Mindful Lunch" },
-    { id: "work-block-2", bucket: "work", startHour: 12.0, endHour: 15.0, name: "Internship & Research: Execution" },
-    { id: "misc-block", bucket: "margin", startHour: 15.0, endHour: 16.0, name: "Email Chores & Margin" },
-    { id: "gym-block", bucket: "fitness", startHour: 16.0, endHour: 17.5, name: "Movement: Gym & Workout" },
-    { id: "cook-dinner-block", bucket: "routine", startHour: 17.5, endHour: 19.5, name: "Kitchen Prep & Cooking" },
-    { id: "eat-dinner-block", bucket: "routine", startHour: 19.5, endHour: 20.0, name: "Dinner Window" },
-    { id: "career-block", bucket: "work", startHour: 20.0, endHour: 21.0, name: "Career Work: Resume & Outreach" },
-    { id: "build-block", bucket: "startup", startHour: 21.0, endHour: 23.0, name: "Own Startup: MVP Code" },
-    { id: "learning-block", bucket: "work", startHour: 23.0, endHour: 24.0, name: "Technical L&D (Systems)" },
-    { id: "sleep-block-2", bucket: "sleep", startHour: 24.0, endHour: 30.0, name: "Sleep & Recovery" }
+    { id: "sleep-block-new", bucket: "sleep", startHour: 24.0, endHour: 30.0, name: "Sleep & Recovery" },
+    { id: "job-search-block", bucket: "work", startHour: 6.0, endHour: 7.0, name: "Job Search Work" },
+    { id: "morning-routine-block", bucket: "routine", startHour: 7.0, endHour: 8.5, name: "Morning Routine + Breakfast" },
+    { id: "internship-block", bucket: "work", startHour: 8.5, endHour: 12.5, name: "Internship / AGAI Research Work" },
+    { id: "lunch-block", bucket: "routine", startHour: 12.5, endHour: 13.0, name: "Lunch" },
+    { id: "rd-block", bucket: "work", startHour: 13.0, endHour: 15.5, name: "Product / Technical R&D" },
+    { id: "gym-block", bucket: "fitness", startHour: 16.0, endHour: 17.0, name: "Gym" },
+    { id: "snacks-misc-block", bucket: "margin", startHour: 17.0, endHour: 18.0, name: "Quick Snacks, Misc Work" },
+    { id: "startup-block", bucket: "startup", startHour: 18.0, endHour: 20.0, name: "Building / Startup Work" },
+    { id: "portfolio-block", bucket: "work", startHour: 20.0, endHour: 21.0, name: "Portfolio" },
+    { id: "pending-work-block", bucket: "work", startHour: 21.5, endHour: 23.0, name: "Day's Pending Work" },
+    { id: "night-routine-block", bucket: "routine", startHour: 23.0, endHour: 24.0, name: "Preparing for Next Day + Night Routine" }
 ];
 
 export const useStore = create((set, get) => ({
