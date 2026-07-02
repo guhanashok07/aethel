@@ -9,6 +9,7 @@ import NotebookView from './components/NotebookView';
 import ArchiveModal from './components/ArchiveModal';
 import RoutineModal from './components/RoutineModal';
 import BudgetModal from './components/BudgetModal';
+import SettingsModal from './components/SettingsModal';
 
 // Static Defaults
 const defaultHabitGroups = [
@@ -193,6 +194,43 @@ export default function App() {
         }
     }, [entities, deleteEntity, saveEntity]);
 
+    // Migrate legacy flat notebook pages into a default notebook container
+    useEffect(() => {
+        if (!entities || entities.length === 0) return;
+
+        const orphanPages = entities.filter(
+            e => e.type === 'note' && e.properties?.notebook === true && !e.properties?.notebookId
+        );
+        if (orphanPages.length === 0) return;
+
+        const defaultNotebookId = 'notebook-default';
+        const existingDefault = entities.find(e => e.id === defaultNotebookId);
+        if (!existingDefault) {
+            const now = new Date().toISOString();
+            saveEntity({
+                id: defaultNotebookId,
+                type: 'notebook',
+                title: 'Notes',
+                createdAt: now,
+                updatedAt: now,
+                properties: { order: 0 }
+            });
+        }
+
+        orphanPages.forEach((page, index) => {
+            saveEntity({
+                ...page,
+                updatedAt: new Date().toISOString(),
+                properties: {
+                    ...page.properties,
+                    notebook: true,
+                    notebookId: defaultNotebookId,
+                    order: page.properties?.order ?? index
+                }
+            });
+        });
+    }, [entities, saveEntity]);
+
     // Keep currentFloatHour updated for Live Marker
     useEffect(() => {
         const updateHour = () => {
@@ -226,17 +264,42 @@ export default function App() {
         return entities.find(e => e.id === 'focus-quick-notes')?.content || '';
     }, [entities]);
 
-    // 1.6. Notebook pages
-    const notebookNotesMapped = useMemo(() => {
+    // 1.6. Notebooks and pages
+    const notebooksMapped = useMemo(() => {
+        return entities
+            .filter(e => e.type === 'notebook')
+            .map(e => ({
+                id: e.id,
+                title: e.title || 'Untitled Notebook',
+                createdAt: e.createdAt,
+                updatedAt: e.updatedAt,
+                order: e.properties?.order ?? 0
+            }))
+            .sort((a, b) => {
+                if (a.order !== b.order) return a.order - b.order;
+                return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
+            });
+    }, [entities]);
+
+    const notebookPagesMapped = useMemo(() => {
         return entities
             .filter(e => e.type === 'note' && e.properties?.notebook === true)
             .map(e => ({
                 id: e.id,
-                title: e.title || 'Untitled Note',
+                notebookId: e.properties?.notebookId || '',
+                title: e.title || 'Untitled Page',
                 content: e.content || '',
+                widthMode: e.properties?.widthMode === 'full' ? 'full' : 'center',
+                fontSize: ['small', 'medium', 'large'].includes(e.properties?.fontSize) ? e.properties.fontSize : 'medium',
+                blocks: e.properties?.blocks || [],
                 createdAt: e.createdAt,
-                updatedAt: e.updatedAt
-            }));
+                updatedAt: e.updatedAt,
+                order: e.properties?.order ?? 0
+            }))
+            .sort((a, b) => {
+                if (a.order !== b.order) return a.order - b.order;
+                return new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime();
+            });
     }, [entities]);
 
     // 2. Custom Columns / Buckets
@@ -688,20 +751,60 @@ export default function App() {
         });
     };
 
-    const handleAddNotebookNote = () => {
+    const handleAddNotebook = () => {
+        pushToUndoStack();
+        const id = 'notebook-' + Date.now();
+        const now = new Date().toISOString();
+        saveEntity({
+            id,
+            type: 'notebook',
+            title: 'Untitled Notebook',
+            createdAt: now,
+            updatedAt: now,
+            properties: { order: Date.now() }
+        });
+        return id;
+    };
+
+    const handleUpdateNotebook = (id, updates) => {
+        const e = entities.find(x => x.id === id);
+        if (!e) return;
+
+        const nextTitle = updates.title !== undefined ? updates.title : e.title;
+        if (nextTitle === e.title) return;
+
+        saveEntity({
+            ...e,
+            title: nextTitle,
+            updatedAt: new Date().toISOString()
+        });
+    };
+
+    const handleDeleteNotebook = (id) => {
+        pushToUndoStack();
+        entities
+            .filter(x => x.type === 'note' && x.properties?.notebookId === id)
+            .forEach(page => deleteEntity(page.id));
+        deleteEntity(id);
+    };
+
+    const handleAddNotebookNote = (notebookId) => {
         pushToUndoStack();
         const id = 'note-' + Date.now();
         const now = new Date().toISOString();
         saveEntity({
             id,
             type: 'note',
-            title: 'Untitled Note',
+            title: 'Untitled Page',
             content: '',
             createdAt: now,
             updatedAt: now,
             properties: {
                 notebook: true,
-                pinned: false
+                notebookId,
+                widthMode: 'center',
+                fontSize: 'medium',
+                order: Date.now()
             }
         });
         return id;
@@ -713,7 +816,19 @@ export default function App() {
 
         const nextTitle = updates.title !== undefined ? updates.title : e.title;
         const nextContent = updates.content !== undefined ? updates.content : e.content;
-        if (nextTitle === e.title && nextContent === e.content) return;
+        const nextWidthMode = updates.widthMode !== undefined ? updates.widthMode : e.properties?.widthMode;
+        const nextFontSize = updates.fontSize !== undefined ? updates.fontSize : e.properties?.fontSize;
+        const nextNotebookId = updates.notebookId !== undefined ? updates.notebookId : e.properties?.notebookId;
+        const nextBlocks = updates.blocks !== undefined ? updates.blocks : e.properties?.blocks;
+
+        if (
+            nextTitle === e.title
+            && nextContent === e.content
+            && nextWidthMode === e.properties?.widthMode
+            && nextFontSize === e.properties?.fontSize
+            && nextNotebookId === e.properties?.notebookId
+            && nextBlocks === e.properties?.blocks
+        ) return;
 
         saveEntity({
             ...e,
@@ -722,7 +837,11 @@ export default function App() {
             updatedAt: new Date().toISOString(),
             properties: {
                 ...e.properties,
-                notebook: true
+                notebook: true,
+                notebookId: nextNotebookId,
+                widthMode: nextWidthMode === 'full' ? 'full' : 'center',
+                fontSize: ['small', 'medium', 'large'].includes(nextFontSize) ? nextFontSize : 'medium',
+                blocks: nextBlocks || []
             }
         });
     };
@@ -1028,9 +1147,34 @@ export default function App() {
     const [isRoutineOpen, setIsRoutineOpen] = useState(false);
     const [routineModalDay, setRoutineModalDay] = useState(new Date(2026, 5, 16));
     const [isBudgetOpen, setIsBudgetOpen] = useState(false);
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [wallpaper, setWallpaper] = useState(() => {
+        try {
+            return localStorage.getItem('aethel-wallpaper') || '';
+        } catch {
+            return '';
+        }
+    });
+
+    const handleSelectWallpaper = (val) => {
+        setWallpaper(val);
+        try {
+            localStorage.setItem('aethel-wallpaper', val);
+        } catch {}
+    };
+
+    const isDarkWallpaper = wallpaper && (
+        wallpaper.includes('mist') || 
+        wallpaper.includes('stars') || 
+        wallpaper.includes('photo-1506318137071') || 
+        wallpaper.includes('#1e293b')
+    );
 
     return (
-        <div className="h-screen flex flex-col antialiased select-none overflow-hidden relative bg-white">
+        <div 
+            className={`h-screen flex flex-col antialiased select-none overflow-hidden relative transition-all duration-300 ${wallpaper ? 'has-wallpaper bg-cover bg-center' : 'bg-white'} ${isDarkWallpaper ? 'has-dark-wallpaper' : ''}`}
+            style={wallpaper ? { backgroundImage: wallpaper } : {}}
+        >
             {/* SVG Noise/Grain Texture Overlay (Global) */}
             <div className="absolute inset-0 pointer-events-none opacity-[0.035] z-40 mix-blend-overlay">
                 <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
@@ -1142,8 +1286,14 @@ export default function App() {
                             </button>
                         </div>
 
-                        <button onClick={() => setIsArchiveOpen(true)} className="hover:text-stone-700 transition" title="Archive"><i className="fa-solid fa-box-archive"></i></button>
-                        <button className="hover:text-stone-700 transition" title="Settings"><i className="fa-solid fa-gear"></i></button>
+                        {activeView === 'board' && (
+                            <button onClick={() => setIsArchiveOpen(true)} className="hover:text-stone-700 transition" title="Archive">
+                                <i className="fa-solid fa-box-archive"></i>
+                            </button>
+                        )}
+                        <button onClick={() => setIsSettingsOpen(true)} className="hover:text-stone-700 transition" title="Settings">
+                            <i className="fa-solid fa-gear"></i>
+                        </button>
                     </div>
                 </nav>
             )}
@@ -1224,10 +1374,14 @@ export default function App() {
                 )}
                 {activeView === 'notebook' && (
                     <NotebookView
-                        notes={notebookNotesMapped}
-                        onAddNote={handleAddNotebookNote}
-                        onUpdateNote={handleUpdateNotebookNote}
-                        onDeleteNote={handleDeleteNotebookNote}
+                        notebooks={notebooksMapped}
+                        pages={notebookPagesMapped}
+                        onAddNotebook={handleAddNotebook}
+                        onUpdateNotebook={handleUpdateNotebook}
+                        onDeleteNotebook={handleDeleteNotebook}
+                        onAddPage={handleAddNotebookNote}
+                        onUpdatePage={handleUpdateNotebookNote}
+                        onDeletePage={handleDeleteNotebookNote}
                     />
                 )}
             </div>
@@ -1274,6 +1428,13 @@ export default function App() {
                 buckets={bucketsConfig}
                 onSaveBudget={handleSaveBudget}
                 onResetBudget={() => defaultBucketsConfig}
+            />
+
+            <SettingsModal
+                isOpen={isSettingsOpen}
+                onClose={() => setIsSettingsOpen(false)}
+                currentWallpaper={wallpaper}
+                onSelectWallpaper={handleSelectWallpaper}
             />
         </div>
     );

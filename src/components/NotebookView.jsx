@@ -1,19 +1,40 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ContentBlock, { DEFAULT_WIDTH as STICKY_WIDTH, DEFAULT_HEIGHT as STICKY_HEIGHT } from './ContentBlock';
+
+const SIDEBAR_STORAGE_KEY = 'aethel-notebook-sidebar-open';
+
+const FONT_SIZE_OPTIONS = [
+    { id: 'small', label: 'S' },
+    { id: 'medium', label: 'M' },
+    { id: 'large', label: 'L' }
+];
 
 const TOOLBAR_GROUPS = [
+    [
+        { id: 'undo', icon: 'fa-rotate-left', label: 'Undo', command: 'undo' },
+        { id: 'redo', icon: 'fa-rotate-right', label: 'Redo', command: 'redo' }
+    ],
     [
         { id: 'bold', icon: 'fa-bold', label: 'Bold', command: 'bold' },
         { id: 'italic', icon: 'fa-italic', label: 'Italic', command: 'italic' },
         { id: 'underline', icon: 'fa-underline', label: 'Underline', command: 'underline' }
     ],
     [
+        { id: 'align-left', icon: 'fa-align-left', label: 'Align left', command: 'justifyLeft' },
+        { id: 'align-center', icon: 'fa-align-center', label: 'Align center', command: 'justifyCenter' },
+        { id: 'align-right', icon: 'fa-align-right', label: 'Align right', command: 'justifyRight' },
+        { id: 'align-justify', icon: 'fa-align-justify', label: 'Justify', command: 'justifyFull' }
+    ],
+    [
+        { id: 'paragraph', icon: 'fa-paragraph', label: 'Normal text', command: 'formatBlock', value: 'p' },
         { id: 'h2', icon: 'fa-heading', label: 'Heading', command: 'formatBlock', value: 'h2' },
         { id: 'quote', icon: 'fa-quote-left', label: 'Quote', command: 'formatBlock', value: 'blockquote' },
         { id: 'clear', icon: 'fa-eraser', label: 'Clear formatting', command: 'removeFormat' }
     ],
     [
         { id: 'ul', icon: 'fa-list-ul', label: 'Bulleted list', command: 'insertUnorderedList' },
-        { id: 'ol', icon: 'fa-list-ol', label: 'Numbered list', command: 'insertOrderedList' }
+        { id: 'ol', icon: 'fa-list-ol', label: 'Numbered list', command: 'insertOrderedList' },
+        { id: 'divider', icon: 'fa-grip-lines', label: 'Section divider', command: 'insertHorizontalRule' }
     ]
 ];
 
@@ -40,60 +61,172 @@ const escapeAttribute = (value) => {
     }[char]));
 };
 
-export default function NotebookView({
-    notes = [],
-    onAddNote,
-    onUpdateNote,
-    onDeleteNote
-}) {
-    const [activeNoteId, setActiveNoteId] = useState('');
-    const [query, setQuery] = useState('');
-    const [isEmpty, setIsEmpty] = useState(true);
-    const editorRef = useRef(null);
-    const fileInputRef = useRef(null);
-    const saveTimerRef = useRef(null);
-    const loadedNoteIdRef = useRef('');
+const readSidebarPreference = () => {
+    try {
+        const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+        if (stored === null) return true;
+        return stored === 'true';
+    } catch {
+        return true;
+    }
+};
 
-    const sortedNotes = useMemo(() => {
-        return [...notes].sort((a, b) => {
-            const aTime = new Date(a.updatedAt || a.createdAt || 0).getTime();
-            const bTime = new Date(b.updatedAt || b.createdAt || 0).getTime();
-            return bTime - aTime;
-        });
-    }, [notes]);
-
-    const filteredNotes = useMemo(() => {
+function LinkPicker({ pages, query, onQueryChange, onSelect, onClose }) {
+    const filtered = useMemo(() => {
         const needle = query.trim().toLowerCase();
-        if (!needle) return sortedNotes;
-        return sortedNotes.filter((note) => {
-            const haystack = `${note.title} ${getPlainText(note.content)}`.toLowerCase();
+        if (!needle) return pages;
+        return pages.filter((page) => {
+            const haystack = `${page.title} ${getPlainText(page.content)}`.toLowerCase();
             return haystack.includes(needle);
         });
-    }, [query, sortedNotes]);
+    }, [pages, query]);
 
-    const activeNote = sortedNotes.find((note) => note.id === activeNoteId) || sortedNotes[0] || null;
+    return (
+        <div className="absolute top-full left-0 mt-2 w-72 bg-white border border-stone-200/70 rounded-2xl shadow-xl z-30 overflow-hidden">
+            <div className="p-3 border-b border-stone-100">
+                <input
+                    autoFocus
+                    value={query}
+                    onChange={(e) => onQueryChange(e.target.value)}
+                    placeholder="Search pages to link..."
+                    className="w-full h-8 rounded-full bg-stone-50 border border-stone-200/60 px-3 text-xs text-stone-700 outline-none focus:border-stone-300"
+                />
+            </div>
+            <div className="max-h-56 overflow-y-auto p-1.5 scroll-hidden">
+                {filtered.map((page) => (
+                    <button
+                        key={page.id}
+                        onClick={() => onSelect(page)}
+                        className="w-full text-left px-3 py-2 rounded-xl hover:bg-stone-50 transition"
+                    >
+                        <p className="text-sm font-medium text-stone-800 truncate">{page.title || 'Untitled Page'}</p>
+                        <p className="text-[10px] text-stone-400 truncate">{getPlainText(page.content) || 'Empty page'}</p>
+                    </button>
+                ))}
+                {filtered.length === 0 && (
+                    <p className="text-center py-6 text-[10px] font-mono uppercase tracking-wider text-stone-400">No pages found</p>
+                )}
+            </div>
+            <div className="p-2 border-t border-stone-100 flex justify-end">
+                <button
+                    onClick={onClose}
+                    className="h-7 px-3 rounded-full text-[10px] font-mono uppercase tracking-wider text-stone-400 hover:text-stone-600 transition"
+                >
+                    Cancel
+                </button>
+            </div>
+        </div>
+    );
+}
+
+export default function NotebookView({
+    notebooks = [],
+    pages = [],
+    onAddNotebook,
+    onUpdateNotebook,
+    onDeleteNotebook,
+    onAddPage,
+    onUpdatePage,
+    onDeletePage
+}) {
+    const [activeNotebookId, setActiveNotebookId] = useState('');
+    const [activePageId, setActivePageId] = useState('');
+    const [expandedNotebooks, setExpandedNotebooks] = useState({});
+    const [sidebarOpen, setSidebarOpen] = useState(readSidebarPreference);
+    const [query, setQuery] = useState('');
+    const [isEmpty, setIsEmpty] = useState(true);
+    const [linkPickerOpen, setLinkPickerOpen] = useState(false);
+    const [linkQuery, setLinkQuery] = useState('');
+    const [editingNotebookId, setEditingNotebookId] = useState('');
+    const [selectionFontSize, setSelectionFontSize] = useState('');
+    const [activeBlockId, setActiveBlockId] = useState('');
+
+    const editorRef = useRef(null);
+    const fileInputRef = useRef(null);
+    const linkPickerRef = useRef(null);
+    const saveTimerRef = useRef(null);
+    const loadedPageIdRef = useRef('');
+    const scrollContainerRef = useRef(null);
+    const blocksEndRef = useRef(null);
+
+    const pagesByNotebook = useMemo(() => {
+        const grouped = {};
+        pages.forEach((page) => {
+            if (!grouped[page.notebookId]) grouped[page.notebookId] = [];
+            grouped[page.notebookId].push(page);
+        });
+        return grouped;
+    }, [pages]);
+
+    const filteredNotebooks = useMemo(() => {
+        const needle = query.trim().toLowerCase();
+        if (!needle) return notebooks;
+
+        return notebooks.filter((notebook) => {
+            const notebookPages = pagesByNotebook[notebook.id] || [];
+            const notebookMatch = notebook.title.toLowerCase().includes(needle);
+            const pageMatch = notebookPages.some((page) => {
+                const haystack = `${page.title} ${getPlainText(page.content)}`.toLowerCase();
+                return haystack.includes(needle);
+            });
+            return notebookMatch || pageMatch;
+        });
+    }, [notebooks, pagesByNotebook, query]);
+
+    const activeNotebook = notebooks.find((nb) => nb.id === activeNotebookId) || notebooks[0] || null;
+    const notebookPages = activeNotebook ? (pagesByNotebook[activeNotebook.id] || []) : [];
+    const activePage = pages.find((page) => page.id === activePageId)
+        || notebookPages[0]
+        || pages[0]
+        || null;
+
+    const navigateToPage = useCallback((notebookId, pageId) => {
+        setActiveNotebookId(notebookId);
+        setActivePageId(pageId);
+        setExpandedNotebooks((prev) => ({ ...prev, [notebookId]: true }));
+    }, []);
 
     useEffect(() => {
-        if (!activeNote && sortedNotes.length > 0) {
-            setActiveNoteId(sortedNotes[0].id);
+        if (!activeNotebook && notebooks.length > 0) {
+            setActiveNotebookId(notebooks[0].id);
+        }
+    }, [activeNotebook, notebooks]);
+
+    useEffect(() => {
+        if (!activePage && notebookPages.length > 0) {
+            setActivePageId(notebookPages[0].id);
             return;
         }
-        if (activeNoteId && !sortedNotes.some((note) => note.id === activeNoteId)) {
-            setActiveNoteId(sortedNotes[0]?.id || '');
+        if (activePageId && !pages.some((page) => page.id === activePageId)) {
+            setActivePageId(notebookPages[0]?.id || pages[0]?.id || '');
         }
-    }, [activeNote, activeNoteId, sortedNotes]);
+    }, [activePage, activePageId, notebookPages, pages]);
 
     useEffect(() => {
-        if (!editorRef.current || !activeNote) return;
+        if (activeNotebookId) {
+            setExpandedNotebooks((prev) => ({ ...prev, [activeNotebookId]: true }));
+        }
+    }, [activeNotebookId]);
+
+    useEffect(() => {
+        if (!editorRef.current || !activePage) return;
 
         const editorHasFocus = document.activeElement === editorRef.current;
-        const noteChanged = loadedNoteIdRef.current !== activeNote.id;
-        if (noteChanged || !editorHasFocus) {
-            editorRef.current.innerHTML = activeNote.content || '';
-            loadedNoteIdRef.current = activeNote.id;
-            setIsEmpty(getPlainText(activeNote.content).trim() === '' && !(activeNote.content || '').includes('<img'));
+        const pageChanged = loadedPageIdRef.current !== activePage.id;
+        if (pageChanged || !editorHasFocus) {
+            editorRef.current.innerHTML = activePage.content || '';
+            loadedPageIdRef.current = activePage.id;
+            setIsEmpty(getPlainText(activePage.content).trim() === '' && !(activePage.content || '').includes('<img'));
         }
-    }, [activeNote]);
+    }, [activePage]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarOpen));
+        } catch {
+            // ignore storage failures
+        }
+    }, [sidebarOpen]);
 
     useEffect(() => {
         return () => {
@@ -101,47 +234,416 @@ export default function NotebookView({
         };
     }, []);
 
+    useEffect(() => {
+        if (!linkPickerOpen) return;
+        const handleClickOutside = (event) => {
+            if (linkPickerRef.current && !linkPickerRef.current.contains(event.target)) {
+                setLinkPickerOpen(false);
+                setLinkQuery('');
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [linkPickerOpen]);
+
+    useEffect(() => {
+        const handleSelectionChange = () => {
+            if (document.activeElement === editorRef.current) {
+                const size = document.queryCommandValue('fontSize');
+                setSelectionFontSize(size || '');
+            }
+        };
+        document.addEventListener('selectionchange', handleSelectionChange);
+        return () => document.removeEventListener('selectionchange', handleSelectionChange);
+    }, []);
+
     const queueContentSave = () => {
-        if (!activeNote || !editorRef.current) return;
+        if (!activePage || !editorRef.current) return;
         const content = editorRef.current.innerHTML;
         setIsEmpty(getPlainText(content).trim() === '' && !content.includes('<img'));
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
         saveTimerRef.current = setTimeout(() => {
-            onUpdateNote(activeNote.id, { content });
+            onUpdatePage(activePage.id, { content });
         }, 350);
     };
 
     const flushContentSave = () => {
-        if (!activeNote || !editorRef.current) return;
+        if (!activePage || !editorRef.current) return;
         if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-        onUpdateNote(activeNote.id, { content: editorRef.current.innerHTML });
+        onUpdatePage(activePage.id, { content: editorRef.current.innerHTML });
     };
 
-    const handleCreateNote = () => {
-        const id = onAddNote();
-        setActiveNoteId(id);
-        requestAnimationFrame(() => {
-            editorRef.current?.focus();
-        });
+    const handleCreateNotebook = () => {
+        const id = onAddNotebook();
+        setActiveNotebookId(id);
+        setExpandedNotebooks((prev) => ({ ...prev, [id]: true }));
+        setEditingNotebookId(id);
     };
 
-    const handleDeleteNote = () => {
-        if (!activeNote) return;
-        if (confirm(`Delete "${activeNote.title || 'Untitled Note'}"?`)) {
-            onDeleteNote(activeNote.id);
+    const handleCreatePage = (notebookId = activeNotebook?.id) => {
+        if (!notebookId) {
+            const newNotebookId = onAddNotebook();
+            setActiveNotebookId(newNotebookId);
+            setExpandedNotebooks((prev) => ({ ...prev, [newNotebookId]: true }));
+            const pageId = onAddPage(newNotebookId);
+            setActivePageId(pageId);
+        } else {
+            const pageId = onAddPage(notebookId);
+            setActiveNotebookId(notebookId);
+            setActivePageId(pageId);
+            setExpandedNotebooks((prev) => ({ ...prev, [notebookId]: true }));
+        }
+        requestAnimationFrame(() => editorRef.current?.focus());
+    };
+
+    const handleDeletePage = () => {
+        if (!activePage) return;
+        if (confirm(`Delete "${activePage.title || 'Untitled Page'}"?`)) {
+            onDeletePage(activePage.id);
         }
     };
 
+    const handleDeleteNotebook = (notebookId) => {
+        const notebook = notebooks.find((nb) => nb.id === notebookId);
+        const pageCount = (pagesByNotebook[notebookId] || []).length;
+        const label = notebook?.title || 'Untitled Notebook';
+        const message = pageCount > 0
+            ? `Delete "${label}" and its ${pageCount} page${pageCount === 1 ? '' : 's'}?`
+            : `Delete "${label}"?`;
+        if (confirm(message)) {
+            onDeleteNotebook(notebookId);
+            if (activeNotebookId === notebookId) {
+                setActiveNotebookId('');
+                setActivePageId('');
+            }
+        }
+    };
+
+    const toggleNotebookExpanded = (notebookId) => {
+        setExpandedNotebooks((prev) => ({ ...prev, [notebookId]: !prev[notebookId] }));
+    };
+
+    // Block CRUD
+    const pageBlocks = useMemo(() => {
+        return (activePage?.blocks || []).sort((a, b) => (a.order || 0) - (b.order || 0));
+    }, [activePage?.blocks]);
+
+    const handleAddBlock = () => {
+        if (!activePage) return;
+        const existingBlocks = activePage.blocks || [];
+        const containerWidth = editorRef.current?.clientWidth || 800;
+        const rightMargin = 24;
+        const x = Math.max(20, containerWidth - STICKY_WIDTH - rightMargin);
+
+        // Stack new stickies below any already sitting in the right-hand column
+        const rightColumnBlocks = existingBlocks.filter((b) => (b.x || 0) >= x - 40);
+        const y = rightColumnBlocks.length > 0
+            ? Math.max(...rightColumnBlocks.map((b) => (b.y || 0) + (b.height || STICKY_HEIGHT))) + 20
+            : 20;
+
+        const newBlock = {
+            id: 'block-' + Date.now(),
+            title: '',
+            content: '',
+            width: STICKY_WIDTH,
+            height: STICKY_HEIGHT,
+            x,
+            y,
+            order: Date.now(),
+            createdAt: new Date().toISOString()
+        };
+        onUpdatePage(activePage.id, { blocks: [...existingBlocks, newBlock] });
+        setActiveBlockId(newBlock.id);
+        // Auto-scroll to the new sticky after render
+        requestAnimationFrame(() => {
+            blocksEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        });
+    };
+
+    const handleUpdateBlock = useCallback((blockId, updates) => {
+        if (!activePage) return;
+        const existingBlocks = activePage.blocks || [];
+        const updatedBlocks = existingBlocks.map(b =>
+            b.id === blockId ? { ...b, ...updates } : b
+        );
+        onUpdatePage(activePage.id, { blocks: updatedBlocks });
+    }, [activePage, onUpdatePage]);
+
+    const handleDeleteBlock = useCallback((blockId) => {
+        if (!activePage) return;
+        const existingBlocks = activePage.blocks || [];
+        const updatedBlocks = existingBlocks.filter(b => b.id !== blockId);
+        onUpdatePage(activePage.id, { blocks: updatedBlocks });
+        if (activeBlockId === blockId) setActiveBlockId('');
+    }, [activePage, onUpdatePage, activeBlockId]);
+
     const runCommand = (command, value = null) => {
-        if (!activeNote) return;
+        if (!activePage) return;
         editorRef.current?.focus();
         document.execCommand(command, false, value);
         queueContentSave();
     };
 
     const handleTitleChange = (e) => {
-        if (!activeNote) return;
-        onUpdateNote(activeNote.id, { title: e.target.value || 'Untitled Note' });
+        if (!activePage) return;
+        onUpdatePage(activePage.id, { title: e.target.value || 'Untitled Page' });
+    };
+
+    const handleWidthModeChange = (widthMode) => {
+        if (!activePage || activePage.widthMode === widthMode) return;
+        onUpdatePage(activePage.id, { widthMode });
+    };
+
+    const handleFontSizeChange = (sizeId) => {
+        if (!activePage) return;
+        editorRef.current?.focus();
+        const sizeMap = {
+            small: '2',
+            medium: '3',
+            large: '5'
+        };
+        document.execCommand('fontSize', false, sizeMap[sizeId]);
+        const size = document.queryCommandValue('fontSize');
+        setSelectionFontSize(size || '');
+        queueContentSave();
+    };
+
+    const insertPageLink = (page) => {
+        if (!activePage || !editorRef.current) return;
+        editorRef.current.focus();
+        const selection = window.getSelection();
+        const label = selection && !selection.isCollapsed
+            ? selection.toString()
+            : (page.title || 'Untitled Page');
+        const html = `<a href="#" class="notebook-page-link" data-page-id="${escapeAttribute(page.id)}" data-notebook-id="${escapeAttribute(page.notebookId)}" contenteditable="false">${escapeAttribute(label)}</a>&nbsp;`;
+        document.execCommand('insertHTML', false, html);
+        queueContentSave();
+        setLinkPickerOpen(false);
+        setLinkQuery('');
+    };
+
+    const insertToggleList = () => {
+        if (!activePage || !editorRef.current) return;
+        editorRef.current.focus();
+        const html = '<details class="notebook-toggle-list"><summary>Toggle</summary><p><br></p></details><p><br></p>';
+        document.execCommand('insertHTML', false, html);
+        queueContentSave();
+    };
+
+    const handleEditorClick = (e) => {
+        const link = e.target.closest('.notebook-page-link');
+        if (link) {
+            e.preventDefault();
+            const pageId = link.dataset.pageId;
+            const notebookId = link.dataset.notebookId;
+            if (pageId && notebookId) {
+                navigateToPage(notebookId, pageId);
+            }
+            return;
+        }
+
+        const toggleSummary = e.target.closest('.notebook-toggle-list summary');
+        if (toggleSummary) {
+            e.preventDefault();
+            const details = toggleSummary.parentElement;
+            if (details) {
+                if (details.hasAttribute('open')) {
+                    details.removeAttribute('open');
+                } else {
+                    details.setAttribute('open', '');
+                }
+            }
+            queueContentSave();
+        }
+    };
+
+    const handleEditorKeyDown = (e) => {
+        const mod = e.metaKey || e.ctrlKey;
+        const key = e.key.toLowerCase();
+
+        // Auto-formatting triggers on pressing Space key
+        if (e.key === ' ' && !mod) {
+            const selection = window.getSelection();
+            if (selection.rangeCount) {
+                const range = selection.getRangeAt(0);
+                const startNode = range.startContainer;
+                
+                if (startNode.nodeType === Node.TEXT_NODE) {
+                    const text = startNode.textContent;
+                    const offset = range.startOffset;
+                    const textBeforeCursor = text.substring(0, offset);
+                    const blockElement = startNode.parentElement?.closest('p, h1, h2, h3, div, li');
+                    
+                    if (blockElement && !['H1', 'H2', 'H3', 'PRE', 'LI'].includes(blockElement.tagName)) {
+                        const cleanedTrigger = textBeforeCursor.trim();
+                        
+                        // 1. Unordered lists: "-" or "*" + Space
+                        if (cleanedTrigger === '-' || cleanedTrigger === '*') {
+                            e.preventDefault();
+                            startNode.textContent = text.substring(offset);
+                            document.execCommand('insertUnorderedList', false, null);
+                            queueContentSave();
+                            return;
+                        }
+                        
+                        // 2. Ordered lists: "1." + Space
+                        if (cleanedTrigger === '1.') {
+                            e.preventDefault();
+                            startNode.textContent = text.substring(offset);
+                            document.execCommand('insertOrderedList', false, null);
+                            queueContentSave();
+                            return;
+                        }
+                        
+                        // 3. Toggle details: ">" + Space
+                        if (cleanedTrigger === '>') {
+                            e.preventDefault();
+                            startNode.textContent = text.substring(offset);
+                            
+                            const details = document.createElement('details');
+                            details.className = 'notebook-toggle-list';
+                            
+                            const summary = document.createElement('summary');
+                            summary.innerHTML = '<br>';
+                            details.appendChild(summary);
+                            
+                            const innerContent = document.createElement('p');
+                            innerContent.innerHTML = '<br>';
+                            details.appendChild(innerContent);
+                            
+                            blockElement.parentNode.replaceChild(details, blockElement);
+                            
+                            const newRange = document.createRange();
+                            newRange.setStart(summary, 0);
+                            newRange.collapse(true);
+                            selection.removeAllRanges();
+                            selection.addRange(newRange);
+                            
+                            queueContentSave();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 1. Cmd/Ctrl + Z / Y Undo & Redo
+        if (mod) {
+            if (key === 'z') {
+                e.preventDefault();
+                runCommand(e.shiftKey ? 'redo' : 'undo');
+                return;
+            }
+            if (key === 'y') {
+                e.preventDefault();
+                runCommand('redo');
+                return;
+            }
+        }
+
+        // 2. Shift + Enter or Alt + Enter: Exit the list or details (toggle) container and insert a paragraph after it
+        if (e.key === 'Enter' && (e.shiftKey || e.altKey)) {
+            const selection = window.getSelection();
+            if (selection.rangeCount) {
+                const range = selection.getRangeAt(0);
+                
+                // Find closest list or details container
+                const startNode = range.startContainer;
+                const element = startNode.nodeType === Node.ELEMENT_NODE ? startNode : startNode.parentElement;
+                const container = element?.closest('details.notebook-toggle-list, ul, ol');
+                
+                if (container) {
+                    e.preventDefault();
+                    const newPara = document.createElement('p');
+                    newPara.innerHTML = '<br>';
+                    container.parentNode.insertBefore(newPara, container.nextSibling);
+                    
+                    const newRange = document.createRange();
+                    newRange.setStart(newPara, 0);
+                    newRange.collapse(true);
+                    selection.removeAllRanges();
+                    selection.addRange(newRange);
+                    
+                    queueContentSave();
+                    return;
+                }
+            }
+        }
+
+        // 3. Enter on Toggle summary: Go into the details block content
+        if (e.key === 'Enter' && !e.altKey && !e.shiftKey) {
+            const selection = window.getSelection();
+            if (selection.rangeCount) {
+                const range = selection.getRangeAt(0);
+                const startNode = range.startContainer;
+                const element = startNode.nodeType === Node.ELEMENT_NODE ? startNode : startNode.parentElement;
+                
+                const summary = element?.closest('.notebook-toggle-list summary');
+                if (summary) {
+                    e.preventDefault();
+                    const details = summary.parentElement;
+                    if (details) {
+                        details.setAttribute('open', '');
+                        
+                        let firstChild = Array.from(details.children).find(child => child.tagName !== 'SUMMARY');
+                        if (!firstChild) {
+                            firstChild = document.createElement('p');
+                            firstChild.innerHTML = '<br>';
+                            details.appendChild(firstChild);
+                        }
+                        
+                        const newRange = document.createRange();
+                        newRange.setStart(firstChild, 0);
+                        newRange.collapse(true);
+                        selection.removeAllRanges();
+                        selection.addRange(newRange);
+                        
+                        queueContentSave();
+                    }
+                    return;
+                }
+            }
+        }
+    };
+
+    const handleDragStart = (e) => {
+        if (e.target.tagName === 'IMG') {
+            e.dataTransfer.setData('text/html', e.target.outerHTML);
+            e.target.classList.add('is-dragging-temp');
+        }
+    };
+
+    const handleDragEnd = (e) => {
+        if (e.target.tagName === 'IMG') {
+            e.target.classList.remove('is-dragging-temp');
+        }
+    };
+
+    const handleDrop = (e) => {
+        if (!editorRef.current) return;
+        const draggedImg = editorRef.current.querySelector('img.is-dragging-temp');
+        if (draggedImg) {
+            let range;
+            if (document.caretRangeFromPoint) {
+                range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            } else if (e.rangeParent) {
+                range = document.createRange();
+                range.setStart(e.rangeParent, e.rangeOffset);
+            }
+            
+            if (range) {
+                e.preventDefault();
+                draggedImg.remove();
+                
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                
+                const cleanHtml = draggedImg.outerHTML.replace(' is-dragging-temp', '');
+                document.execCommand('insertHTML', false, cleanHtml);
+                queueContentSave();
+            }
+        }
     };
 
     const handlePaste = (e) => {
@@ -159,12 +661,12 @@ export default function NotebookView({
     };
 
     const insertImageFile = (file) => {
-        if (!file || !activeNote) return;
+        if (!file || !activePage) return;
         const reader = new FileReader();
         reader.onload = () => {
             const alt = escapeAttribute(file.name || 'Notebook image');
             editorRef.current?.focus();
-            document.execCommand('insertHTML', false, `<figure><img src="${reader.result}" alt="${alt}" /><figcaption>${alt}</figcaption></figure>`);
+            document.execCommand('insertHTML', false, `<img src="${reader.result}" alt="${alt}" />`);
             queueContentSave();
         };
         reader.readAsDataURL(file);
@@ -176,27 +678,73 @@ export default function NotebookView({
         e.target.value = '';
     };
 
+    const handleNotebookTitleBlur = (notebookId, value) => {
+        setEditingNotebookId('');
+        onUpdateNotebook(notebookId, { title: value.trim() || 'Untitled Notebook' });
+    };
+
+    const renderNotebookPages = (notebookId) => {
+        const notebookPageList = pagesByNotebook[notebookId] || [];
+        const needle = query.trim().toLowerCase();
+        const visiblePages = needle
+            ? notebookPageList.filter((page) => {
+                const haystack = `${page.title} ${getPlainText(page.content)}`.toLowerCase();
+                return haystack.includes(needle);
+            })
+            : notebookPageList;
+
+        if (visiblePages.length === 0 && needle) return null;
+
+        return visiblePages.map((page) => {
+            const selected = page.id === activePage?.id;
+            const preview = getPlainText(page.content).trim() || 'No additional text';
+            return (
+                <button
+                    key={page.id}
+                    onClick={() => navigateToPage(notebookId, page.id)}
+                    className={`w-full text-left pl-8 pr-3 py-2.5 rounded-xl border transition group ${selected ? 'sidebar-active-page bg-white border-stone-200/60 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.04)]' : 'bg-transparent border-transparent hover:bg-white/55 hover:border-stone-200/40'}`}
+                >
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex items-start gap-2">
+                            <i className="fa-regular fa-file-lines text-[10px] text-stone-300 mt-1 shrink-0"></i>
+                            <h3 className="text-sm font-medium text-stone-800 truncate">{page.title || 'Untitled Page'}</h3>
+                        </div>
+                        <span className="text-[9px] font-mono text-stone-350 shrink-0 pt-0.5">{formatUpdatedAt(page.updatedAt)}</span>
+                    </div>
+                    <p className="mt-1 pl-5 text-[11px] leading-snug text-stone-400 line-clamp-2">{preview}</p>
+                </button>
+            );
+        });
+    };
+
+    const widthMode = 'full';
+    const fontSize = ['small', 'medium', 'large'].includes(activePage?.fontSize) ? activePage.fontSize : 'medium';
+
     return (
-        <main className="flex-1 overflow-hidden pt-20 px-6 pb-8 bg-transparent text-stone-800 font-sans select-none">
-            <div className="h-full max-w-[1500px] mx-auto grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
-                <section className="min-h-0 bg-white/58 backdrop-blur-xl border border-stone-200/45 shadow-sm rounded-[28px] overflow-hidden flex flex-col">
-                    {activeNote ? (
+        <main className="flex-1 overflow-hidden pt-20 px-4 md:px-6 pb-8 bg-transparent text-stone-800 font-sans">
+            <div className="h-full max-w-[1600px] mx-auto flex gap-4">
+                <section className="flex-1 min-w-0 min-h-0 bg-white/58 backdrop-blur-xl border border-stone-200/45 shadow-sm rounded-[28px] overflow-hidden flex flex-col">
+                    {activePage ? (
                         <>
                             <header className="px-6 md:px-10 pt-7 pb-4 border-b border-stone-200/45 flex flex-col gap-5">
-                                <div className="flex items-center justify-between gap-4">
+                                <div className="flex items-start justify-between gap-4">
                                     <div className="min-w-0 flex-1">
-                                        <span className="text-[10px] font-mono uppercase tracking-[0.24em] text-stone-400">Notebook</span>
+                                        <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-stone-400">
+                                            <span>{activeNotebook?.title || 'Notebook'}</span>
+                                            <i className="fa-solid fa-chevron-right text-[8px] text-stone-300"></i>
+                                            <span className="text-stone-500">page</span>
+                                        </div>
                                         <input
-                                            value={activeNote.title}
+                                            value={activePage.title}
                                             onChange={handleTitleChange}
                                             className="mt-1 w-full bg-transparent outline-none font-cormorant italic text-4xl md:text-5xl leading-tight text-stone-850 placeholder:text-stone-300"
-                                            placeholder="Untitled Note"
+                                            placeholder="Untitled Page"
                                         />
                                     </div>
                                     <button
-                                        onClick={handleDeleteNote}
+                                        onClick={handleDeletePage}
                                         className="w-9 h-9 rounded-full bg-stone-50 border border-stone-200/60 text-stone-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition shrink-0"
-                                        title="Delete note"
+                                        title="Delete page"
                                     >
                                         <i className="fa-solid fa-trash-can text-xs"></i>
                                     </button>
@@ -218,8 +766,56 @@ export default function NotebookView({
                                                 ))}
                                             </div>
                                         ))}
+                                        <button
+                                            onClick={insertToggleList}
+                                            className="h-9 px-3 rounded-full bg-stone-50/80 border border-stone-200/50 text-stone-500 hover:text-stone-850 hover:bg-white transition flex items-center gap-2"
+                                            title="Insert toggle list"
+                                        >
+                                            <i className="fa-solid fa-caret-down text-[11px]"></i>
+                                            <span className="text-[10px] font-mono uppercase tracking-wider">Toggle</span>
+                                        </button>
+                                        <div className="relative" ref={linkPickerRef}>
+                                            <button
+                                                onClick={() => setLinkPickerOpen((open) => !open)}
+                                                className="h-9 px-3 rounded-full bg-stone-50/80 border border-stone-200/50 text-stone-500 hover:text-stone-850 hover:bg-white transition flex items-center gap-2"
+                                                title="Link to page"
+                                            >
+                                                <i className="fa-solid fa-link text-[11px]"></i>
+                                                <span className="text-[10px] font-mono uppercase tracking-wider">Link</span>
+                                            </button>
+                                            {linkPickerOpen && (
+                                                <LinkPicker
+                                                    pages={pages.filter((page) => page.id !== activePage.id)}
+                                                    query={linkQuery}
+                                                    onQueryChange={setLinkQuery}
+                                                    onSelect={insertPageLink}
+                                                    onClose={() => {
+                                                        setLinkPickerOpen(false);
+                                                        setLinkQuery('');
+                                                    }}
+                                                />
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                                        <div className="flex items-center gap-1 bg-stone-50/80 border border-stone-200/50 rounded-full p-1">
+                                            {FONT_SIZE_OPTIONS.map((option) => {
+                                                const sizeMap = { small: '2', medium: '3', large: '5' };
+                                                const isSizeActive = selectionFontSize
+                                                    ? selectionFontSize === sizeMap[option.id]
+                                                    : fontSize === option.id;
+                                                return (
+                                                    <button
+                                                        key={option.id}
+                                                        onClick={() => handleFontSizeChange(option.id)}
+                                                        className={`w-8 h-8 rounded-full text-[10px] font-mono uppercase tracking-wider transition ${isSizeActive ? 'bg-white text-stone-800 shadow-sm' : 'text-stone-500 hover:text-stone-800'}`}
+                                                        title={`${option.id.charAt(0).toUpperCase()}${option.id.slice(1)} text`}
+                                                    >
+                                                        {option.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                         <input
                                             ref={fileInputRef}
                                             type="file"
@@ -227,6 +823,14 @@ export default function NotebookView({
                                             className="hidden"
                                             onChange={handleFileChange}
                                         />
+                                        <button
+                                            onClick={handleAddBlock}
+                                            className="h-9 px-3 rounded-full bg-stone-50/80 border border-stone-200/50 text-stone-500 hover:text-stone-850 hover:bg-white transition flex items-center gap-2"
+                                            title="Add sticky note"
+                                        >
+                                            <i className="fa-solid fa-note-sticky text-[11px]"></i>
+                                            <span className="text-[10px] font-mono uppercase tracking-wider">Sticky</span>
+                                        </button>
                                         <button
                                             onClick={() => fileInputRef.current?.click()}
                                             className="h-9 px-3 rounded-full bg-stone-800 text-white text-[10px] font-mono uppercase tracking-wider hover:bg-stone-700 transition flex items-center gap-2"
@@ -238,86 +842,204 @@ export default function NotebookView({
                                 </div>
                             </header>
 
-                            <div className="flex-1 min-h-0 overflow-y-auto scroll-hidden px-6 md:px-10 py-8 select-text">
-                                <div
-                                    ref={editorRef}
-                                    contentEditable
-                                    suppressContentEditableWarning
-                                    onInput={queueContentSave}
-                                    onBlur={flushContentSave}
-                                    onPaste={handlePaste}
-                                    className={`notebook-page-editor max-w-3xl mx-auto min-h-full outline-none text-stone-750 ${isEmpty ? 'is-empty' : ''}`}
-                                    placeholder="Start writing..."
-                                />
+                            <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto scroll-hidden px-6 md:px-10 py-8 select-text">
+                                <div className="notebook-canvas">
+                                    <div
+                                        ref={editorRef}
+                                        contentEditable
+                                        suppressContentEditableWarning
+                                        onInput={queueContentSave}
+                                        onBlur={flushContentSave}
+                                        onPaste={handlePaste}
+                                        onClick={(e) => {
+                                            handleEditorClick(e);
+                                            setActiveBlockId('');
+                                        }}
+                                        onKeyDown={handleEditorKeyDown}
+                                        onDragStart={handleDragStart}
+                                        onDragEnd={handleDragEnd}
+                                        onDrop={handleDrop}
+                                        className={`notebook-page-editor outline-none text-stone-750 min-h-full ${widthMode === 'full' ? 'is-full-width' : 'is-center-width'} is-${fontSize} ${isEmpty ? 'is-empty' : ''}`}
+                                        placeholder="Start writing..."
+                                    />
+
+                                    {/* Content Blocks */}
+                                    {pageBlocks.length > 0 && (
+                                        <div className="content-blocks-section">
+                                            {pageBlocks.map((block) => (
+                                                <ContentBlock
+                                                    key={block.id}
+                                                    block={block}
+                                                    onUpdate={handleUpdateBlock}
+                                                    onDelete={handleDeleteBlock}
+                                                    isActive={activeBlockId === block.id}
+                                                    onFocus={setActiveBlockId}
+                                                    fontSize={fontSize}
+                                                    canvasWidth={editorRef.current?.clientWidth || 800}
+                                                />
+                                            ))}
+                                            <div ref={blocksEndRef} />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </>
                     ) : (
                         <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
                             <div className="w-12 h-12 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-400 mb-5">
-                                <i className="fa-regular fa-note-sticky text-lg"></i>
+                                <i className="fa-regular fa-book-open text-lg"></i>
                             </div>
                             <h2 className="font-cormorant italic text-4xl text-stone-800 mb-2">a blank shelf</h2>
                             <p className="text-sm text-stone-400 max-w-sm leading-relaxed mb-6">
-                                Create your first note and Aethel will keep it with the rest of your workspace.
+                                Create a notebook, add pages inside it, and link between them as your ideas grow.
                             </p>
-                            <button
-                                onClick={handleCreateNote}
-                                className="h-10 px-4 rounded-full bg-stone-800 text-white text-[10px] font-mono uppercase tracking-wider hover:bg-stone-700 transition"
-                            >
-                                New Note
-                            </button>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={handleCreateNotebook}
+                                    className="h-10 px-4 rounded-full bg-stone-100 border border-stone-200 text-stone-700 text-[10px] font-mono uppercase tracking-wider hover:bg-white transition"
+                                >
+                                    New Notebook
+                                </button>
+                                <button
+                                    onClick={() => handleCreatePage()}
+                                    className="h-10 px-4 rounded-full bg-stone-800 text-white text-[10px] font-mono uppercase tracking-wider hover:bg-stone-700 transition"
+                                >
+                                    New Page
+                                </button>
+                            </div>
                         </div>
                     )}
                 </section>
 
-                <aside className="min-h-0 bg-white/46 backdrop-blur-xl border border-stone-200/45 shadow-sm rounded-[28px] overflow-hidden flex flex-col lg:order-last">
+                {!sidebarOpen && (
+                    <button
+                        onClick={() => setSidebarOpen(true)}
+                        className="hidden lg:flex fixed right-4 top-24 z-20 w-10 h-10 rounded-full bg-white/80 backdrop-blur border border-stone-200/60 text-stone-500 hover:text-stone-850 hover:bg-white shadow-sm transition items-center justify-center"
+                        title="Open sidebar"
+                    >
+                        <i className="fa-solid fa-bars-staggered text-sm"></i>
+                    </button>
+                )}
+
+                <aside
+                    className={`shrink-0 min-h-0 bg-white/46 backdrop-blur-xl border border-stone-200/45 shadow-sm rounded-[28px] overflow-hidden flex flex-col transition-all duration-300 ease-out ${sidebarOpen ? 'w-[320px] opacity-100' : 'w-0 opacity-0 pointer-events-none overflow-hidden border-0 p-0'}`}
+                >
                     <header className="p-5 border-b border-stone-200/45">
                         <div className="flex items-center justify-between mb-4">
                             <div>
-                                <h2 className="font-cormorant italic text-2xl text-stone-800 lowercase">pages</h2>
-                                <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-stone-400">{sortedNotes.length} notes</p>
+                                <h2 className="font-cormorant italic text-2xl text-stone-800 lowercase">library</h2>
+                                <p className="text-[9px] font-mono uppercase tracking-[0.2em] text-stone-400">
+                                    {notebooks.length} notebook{notebooks.length === 1 ? '' : 's'} · {pages.length} page{pages.length === 1 ? '' : 's'}
+                                </p>
                             </div>
-                            <button
-                                onClick={handleCreateNote}
-                                className="w-9 h-9 rounded-full bg-stone-800 text-white hover:bg-stone-700 transition"
-                                title="New note"
-                            >
-                                <i className="fa-solid fa-plus text-xs"></i>
-                            </button>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    onClick={handleCreateNotebook}
+                                    className="w-9 h-9 rounded-full bg-stone-50 border border-stone-200/60 text-stone-400 hover:text-stone-750 transition flex items-center justify-center"
+                                    title="New notebook"
+                                >
+                                    <i className="fa-solid fa-book text-xs"></i>
+                                </button>
+                                <button
+                                    onClick={() => setSidebarOpen(false)}
+                                    className="w-9 h-9 rounded-full bg-stone-50 border border-stone-200/60 text-stone-400 hover:text-stone-750 transition flex items-center justify-center"
+                                    title="Collapse sidebar"
+                                >
+                                    <i className="fa-solid fa-chevron-right text-xs"></i>
+                                </button>
+                            </div>
                         </div>
                         <div className="relative">
                             <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-stone-300 text-[11px]"></i>
                             <input
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search pages"
+                                placeholder="Search notebooks & pages"
                                 className="w-full h-9 rounded-full bg-stone-50/80 border border-stone-200/50 pl-9 pr-3 text-xs text-stone-700 placeholder:text-stone-400 outline-none focus:border-stone-300"
                             />
                         </div>
                     </header>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1.5 scroll-hidden">
-                        {filteredNotes.map(note => {
-                            const selected = note.id === activeNote?.id;
-                            const preview = getPlainText(note.content).trim() || 'No additional text';
+                    <div className="flex-1 min-h-0 overflow-y-auto p-3 space-y-2 scroll-hidden">
+                        {filteredNotebooks.map((notebook) => {
+                            const expanded = expandedNotebooks[notebook.id] ?? true;
+                            const pageCount = (pagesByNotebook[notebook.id] || []).length;
+                            const isActiveNotebook = notebook.id === activeNotebook?.id;
+
                             return (
-                                <button
-                                    key={note.id}
-                                    onClick={() => setActiveNoteId(note.id)}
-                                    className={`w-full text-left p-3 rounded-2xl border transition group ${selected ? 'bg-white border-stone-300/70 shadow-sm' : 'bg-transparent border-transparent hover:bg-white/55 hover:border-stone-200/60'}`}
-                                >
-                                    <div className="flex items-start justify-between gap-3">
-                                        <h3 className="text-sm font-semibold text-stone-800 truncate">{note.title || 'Untitled Note'}</h3>
-                                        <span className="text-[9px] font-mono text-stone-350 shrink-0 pt-0.5">{formatUpdatedAt(note.updatedAt)}</span>
+                                <div key={notebook.id} className="rounded-2xl border border-transparent group">
+                                    <div className={`flex items-center gap-1 rounded-2xl transition ${isActiveNotebook ? 'bg-stone-100/70' : 'hover:bg-white/50'}`}>
+                                        <button
+                                            onClick={() => toggleNotebookExpanded(notebook.id)}
+                                            className="w-8 h-10 shrink-0 text-stone-400 hover:text-stone-600 transition"
+                                            title={expanded ? 'Collapse notebook' : 'Expand notebook'}
+                                        >
+                                            <i className={`fa-solid fa-chevron-right text-[10px] transition-transform ${expanded ? 'rotate-90' : ''}`}></i>
+                                        </button>
+                                        {editingNotebookId === notebook.id ? (
+                                            <input
+                                                autoFocus
+                                                defaultValue={notebook.title}
+                                                onBlur={(e) => handleNotebookTitleBlur(notebook.id, e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') e.currentTarget.blur();
+                                                }}
+                                                className="flex-1 min-w-0 bg-transparent outline-none text-sm font-semibold text-stone-800 py-2 pr-2"
+                                            />
+                                        ) : (
+                                            <button
+                                                onClick={() => {
+                                                    setActiveNotebookId(notebook.id);
+                                                    setExpandedNotebooks((prev) => ({ ...prev, [notebook.id]: true }));
+                                                }}
+                                                onDoubleClick={() => setEditingNotebookId(notebook.id)}
+                                                className="flex-1 min-w-0 text-left py-2 pr-1"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <i className="fa-solid fa-book-open text-[11px] text-stone-400 shrink-0"></i>
+                                                    <span className="text-sm font-semibold text-stone-800 truncate">{notebook.title}</span>
+                                                    <span className="text-[9px] font-mono text-stone-350 shrink-0">{pageCount}</span>
+                                                </div>
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => handleCreatePage(notebook.id)}
+                                            className="w-8 h-10 shrink-0 text-stone-400 hover:text-stone-700 transition"
+                                            title="Add page"
+                                        >
+                                            <i className="fa-solid fa-plus text-[10px]"></i>
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeleteNotebook(notebook.id)}
+                                            className="w-8 h-10 shrink-0 text-stone-300 hover:text-red-500 transition opacity-0 group-hover:opacity-100 mr-1"
+                                            title="Delete notebook"
+                                        >
+                                            <i className="fa-solid fa-trash-can text-[10px]"></i>
+                                        </button>
                                     </div>
-                                    <p className="mt-1 text-[11px] leading-snug text-stone-400 line-clamp-2">{preview}</p>
-                                </button>
+
+                                    {expanded && (
+                                        <div className="mt-1 space-y-1">
+                                            {renderNotebookPages(notebook.id)}
+                                            {(pagesByNotebook[notebook.id] || []).length === 0 && (
+                                                <button
+                                                    onClick={() => handleCreatePage(notebook.id)}
+                                                    className="w-full text-left pl-8 pr-3 py-2 text-[11px] text-stone-400 hover:text-stone-600 transition"
+                                                >
+                                                    + Add first page
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             );
                         })}
 
-                        {filteredNotes.length === 0 && (
+                        {filteredNotebooks.length === 0 && (
                             <div className="text-center py-10 px-4">
-                                <p className="text-[10px] font-mono uppercase tracking-wider text-stone-400">No pages found.</p>
+                                <p className="text-[10px] font-mono uppercase tracking-wider text-stone-400">
+                                    {notebooks.length === 0 ? 'No notebooks yet.' : 'No matches found.'}
+                                </p>
                             </div>
                         )}
                     </div>

@@ -387,11 +387,66 @@ body {
 }
 
 .notebook-page-editor {
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.72;
   font-weight: 400;
   letter-spacing: 0;
   color: #44403c;
+}
+
+.notebook-page-editor.is-small {
+  font-size: 13.5px;
+  line-height: 1.66;
+}
+
+.notebook-page-editor.is-medium {
+  font-size: 15px;
+  line-height: 1.72;
+}
+
+.notebook-page-editor.is-large {
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+.notebook-page-editor.is-center-width {
+  max-width: 48rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.notebook-page-editor.is-full-width {
+  max-width: none;
+  width: 100%;
+}
+
+/* Local font size overrides */
+.notebook-page-editor font[size="2"] {
+  font-size: 13.5px !important;
+}
+
+.notebook-page-editor font[size="3"] {
+  font-size: 15px !important;
+}
+
+.notebook-page-editor font[size="5"] {
+  font-size: 18px !important;
+}
+
+.notebook-page-editor .notebook-page-link {
+  color: #92400e;
+  text-decoration: underline;
+  text-decoration-color: rgba(146, 64, 14, 0.35);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0 1px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.notebook-page-editor .notebook-page-link:hover {
+  color: #78350f;
+  background: rgba(254, 243, 199, 0.55);
 }
 
 .notebook-page-editor.is-empty:not(:focus)::before {
@@ -440,6 +495,12 @@ body {
   margin: 0.2rem 0;
 }
 
+.notebook-page-editor hr {
+  margin: 1.5rem 0;
+  border: 0;
+  border-top: 1px solid rgba(214, 211, 209, 0.85);
+}
+
 .notebook-page-editor blockquote {
   margin: 1rem 0;
   padding: 0.75rem 1rem;
@@ -458,7 +519,9 @@ body {
 }
 
 .notebook-page-editor img {
-  display: block;
+  display: inline-block;
+  vertical-align: middle;
+  margin: 0.75rem 0;
   max-width: 100%;
   max-height: 520px;
   object-fit: contain;
@@ -467,10 +530,456 @@ body {
   box-shadow: 0 18px 42px rgba(120, 113, 108, 0.12);
 }
 
-.notebook-page-editor figcaption {
-  margin-top: 0.5rem;
-  color: #a8a29e;
-  font-size: 11px;
-  font-family: "Inter", sans-serif;
-  text-align: center;
+.notebook-page-editor .notebook-toggle-list {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  position: relative;
 }
+
+.notebook-page-editor .notebook-toggle-list summary {
+  list-style: none;
+  cursor: pointer;
+  font-weight: 600;
+  color: #292524;
+  outline: none;
+  display: block;
+}
+
+.notebook-page-editor .notebook-toggle-list summary::-webkit-details-marker {
+  display: none;
+}
+
+.notebook-page-editor .notebook-toggle-list summary::before {
+  content: "▶";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  font-size: 9px;
+  color: #a8a29e;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+.notebook-page-editor .notebook-toggle-list[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.notebook-page-editor .notebook-toggle-list > *:not(summary) {
+  padding-left: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+/* Glassmorphism/Translucency rules when a wallpaper background is active */
+.has-wallpaper nav {
+  background: rgba(255, 255, 255, 0.45) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+.has-wallpaper aside {
+  background: rgba(255, 255, 255, 0.35) !important;
+  backdrop-filter: blur(20px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.has-wallpaper section {
+  background: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(20px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(160%) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Maintain inputs as transparent, styling search fields as translucent */
+.has-wallpaper input {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.has-wallpaper input[placeholder*="Search"] {
+  background-color: rgba(255, 255, 255, 0.35) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+/* Maintain generic buttons as transparent, style hover and active selections cleanly */
+.has-wallpaper button:not(.bg-stone-850):not(.bg-stone-900):not(.bg-stone-950):not(.bg-stone-800):not(.bg-black) {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.has-wallpaper button:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Hide breathing auras on HomeView when wallpaper is active */
+.has-wallpaper .home-auras-container {
+  display: none !important;
+}
+
+/* Ensure white background utilities are styled as clean glassmorphism when wallpaper is active */
+.has-wallpaper .bg-white\/42,
+.has-wallpaper .bg-white\/58,
+.has-wallpaper .bg-white\/80,
+.has-wallpaper .bg-white\/90,
+.has-wallpaper .bg-white\/75,
+.has-wallpaper .bg-white {
+  background-color: rgba(255, 255, 255, 0.4) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Styles for active/selected items and navigation page tabs */
+.has-wallpaper button.bg-white,
+.has-wallpaper button.bg-stone-950,
+.has-wallpaper button.shadow-sm {
+  background-color: rgba(255, 255, 255, 0.45) !important;
+  color: #292524 !important;
+}
+
+/* Toolbar pill boxes background */
+.has-wallpaper .bg-stone-50\/80,
+.has-wallpaper .bg-stone-50\/60 {
+  background-color: rgba(255, 255, 255, 0.25) !important;
+  backdrop-filter: blur(8px) !important;
+  border: none !important;
+}
+
+/* Dark glass theme overrides */
+.has-dark-wallpaper .bg-white\/42,
+.has-dark-wallpaper .bg-white\/58,
+.has-dark-wallpaper .bg-white\/80,
+.has-dark-wallpaper .bg-white\/90,
+.has-dark-wallpaper .bg-white\/75,
+.has-dark-wallpaper .bg-white {
+  background-color: rgba(15, 23, 42, 0.45) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: #f1f5f9 !important;
+}
+
+.has-dark-wallpaper nav {
+  background: rgba(15, 23, 42, 0.45) !important;
+  color: #f1f5f9 !important;
+}
+
+.has-dark-wallpaper nav button,
+.has-dark-wallpaper nav span,
+.has-dark-wallpaper nav h1 {
+  color: #cbd5e1 !important;
+}
+
+.has-dark-wallpaper nav button.text-stone-850 {
+  color: #ffffff !important;
+}
+
+.has-dark-wallpaper aside {
+  background: rgba(15, 23, 42, 0.35) !important;
+  color: #e2e8f0 !important;
+}
+
+.has-dark-wallpaper aside h2,
+.has-dark-wallpaper aside h3,
+.has-dark-wallpaper aside span,
+.has-dark-wallpaper aside p,
+.has-dark-wallpaper aside i {
+  color: #cbd5e1 !important;
+}
+
+.has-dark-wallpaper section {
+  background: rgba(15, 23, 42, 0.4) !important;
+  color: #f1f5f9 !important;
+}
+
+.has-dark-wallpaper .notebook-page-editor {
+  color: #e2e8f0 !important;
+}
+
+.has-dark-wallpaper .notebook-page-editor h2,
+.has-dark-wallpaper .notebook-page-editor p {
+  color: #f8fafc !important;
+}
+
+.has-dark-wallpaper input {
+  color: #f8fafc !important;
+}
+
+.has-dark-wallpaper button.bg-white,
+.has-dark-wallpaper .bg-white {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+}
+
+.has-dark-wallpaper .bg-stone-50\/80,
+.has-dark-wallpaper .bg-stone-50\/60 {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+.has-dark-wallpaper .bg-stone-50\/80 button,
+.has-dark-wallpaper .bg-stone-50\/60 button {
+  color: #cbd5e1 !important;
+}
+
+.has-dark-wallpaper button:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Board columns & task cards glass overrides */
+.has-wallpaper .board-container {
+  background-color: rgba(255, 255, 255, 0.25) !important;
+  backdrop-filter: blur(20px) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.has-dark-wallpaper .board-container {
+  background-color: rgba(15, 23, 42, 0.35) !important;
+  backdrop-filter: blur(20px) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.has-dark-wallpaper .task-card {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  border: none !important;
+  color: #e2e8f0 !important;
+}
+
+/* Subtle highlights for the active page in the library list under wallpapers */
+.has-wallpaper .sidebar-active-page {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.has-dark-wallpaper .sidebar-active-page {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: #ffffff !important;
+}
+
+/* ───────────────────────────────────────────────
+   Sticky Notes — free-form canvas partitions
+   ─────────────────────────────────────────────── */
+
+/* Canvas — shared positioning context so stickies can reach the very
+   top of the page, right under the toolbar, instead of being pushed
+   below the text flow */
+.notebook-canvas {
+  position: relative;
+}
+
+/* Overlay layer for the stickies — spans the full page so y:0 lines
+   up with the top of the text editor; clicks pass through to the
+   text underneath except where a sticky actually sits */
+.content-blocks-section {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Individual sticky note — absolutely positioned, opaque paper */
+.content-block {
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  background: #eeece9;
+  border-radius: 2px 2px 12px 12px;
+  border: 1px solid rgba(87, 83, 78, 0.16);
+  box-shadow: 0 10px 20px -10px rgba(41, 37, 36, 0.3), 0 2px 5px rgba(41, 37, 36, 0.12);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  user-select: auto;
+  pointer-events: auto;
+}
+
+.content-block:nth-of-type(odd) {
+  transform: rotate(-0.6deg);
+}
+
+.content-block:nth-of-type(even) {
+  transform: rotate(0.6deg);
+}
+
+.content-block:hover {
+  box-shadow: 0 14px 26px -10px rgba(41, 37, 36, 0.35), 0 3px 6px rgba(41, 37, 36, 0.14);
+  border-color: rgba(87, 83, 78, 0.28);
+}
+
+.content-block.is-active {
+  border-color: rgba(87, 83, 78, 0.38);
+  box-shadow: 0 14px 28px -10px rgba(41, 37, 36, 0.38), 0 3px 8px rgba(41, 37, 36, 0.16);
+  z-index: 2;
+  transform: rotate(0deg);
+}
+
+.content-block.is-dragging {
+  opacity: 0.97;
+  box-shadow: 0 20px 36px -12px rgba(41, 37, 36, 0.4);
+  z-index: 10;
+  cursor: grabbing;
+  transform: rotate(0deg) scale(1.01);
+}
+
+.content-block.is-resizing {
+  z-index: 10;
+}
+
+.content-block.is-entering {
+  animation: block-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes block-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) rotate(-3deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Drag handle bar at top */
+.content-block-handle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 2px 0;
+  cursor: grab;
+  border-radius: 2px 2px 0 0;
+}
+
+.content-block.is-dragging .content-block-handle {
+  cursor: grabbing;
+}
+
+/* Vertical accent divider inside the handle */
+.content-block-divider {
+  width: 3px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  background: rgba(87, 83, 78, 0.28);
+  transition: background 0.2s ease;
+}
+
+.content-block:hover .content-block-divider,
+.content-block.is-active .content-block-divider {
+  background: rgba(68, 64, 60, 0.48);
+}
+
+.content-block-handle-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.content-block-grip {
+  color: #a8a29e;
+  transition: opacity 0.2s ease;
+}
+
+.content-block:hover .content-block-grip {
+  opacity: 1 !important;
+}
+
+/* Actions (delete) */
+.content-block-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.content-block-actions.is-visible {
+  opacity: 1;
+}
+
+.content-block-delete {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #c8c3bc;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.content-block-delete:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* Block editor wrapper */
+.content-block-editor-wrapper {
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 0 0 8px 8px;
+}
+
+/* Block editor */
+.content-block-editor {
+  min-height: 100%;
+  padding: 8px 12px 12px;
+  outline: none;
+}
+
+.content-block-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #a8a29e;
+  opacity: 0.5;
+  pointer-events: none;
+  font-style: italic;
+  font-size: 13px;
+}
+
+/* Resize handle (bottom-right corner) */
+.content-block-resize-handle {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 2px;
+}
+
+.content-block:hover .content-block-resize-handle,
+.content-block.is-resizing .content-block-resize-handle {
+  opacity: 1;
+}
+
+.content-block-resize-grip {
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid rgba(87, 83, 78, 0.32);
+  border-bottom: 2px solid rgba(87, 83, 78, 0.32);
+  border-radius: 0 0 3px 0;
+  transition: border-color 0.15s ease;
+}
+
+.content-block-resize-handle:hover .content-block-resize-grip,
+.content-block.is-resizing .content-block-resize-grip {
+  border-color: rgba(68, 64, 60, 0.52);
+}
+

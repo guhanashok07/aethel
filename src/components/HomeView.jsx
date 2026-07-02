@@ -5,7 +5,7 @@ export default function HomeView({ onNavigate }) {
         <div className="flex-1 relative overflow-hidden bg-transparent flex flex-col justify-between p-8 md:p-16 select-none font-sans">
 
             {/* Breathing OS Radial Pulse (Background Glows with staggered out-of-phase animations) */}
-            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none home-auras-container">
                 {/* Coral Aura — starts immediately */}
                 <div className="absolute top-12 left-10 w-[450px] h-[450px] rounded-full bg-gradient-to-br from-rose-200 via-rose-300/60 to-orange-200/50 blur-[110px] animate-breathe-coral" style={{ animationDelay: '0s' }}></div>
                 {/* Indigo/Lavender Aura — offset by 5s so it's fading in while coral fades out */}
