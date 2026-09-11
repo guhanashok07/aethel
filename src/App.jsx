@@ -10,7 +10,7 @@ import VaultView from './components/VaultView';
 import ArchiveModal from './components/ArchiveModal';
 import RoutineModal from './components/RoutineModal';
 import BudgetModal from './components/BudgetModal';
-import SettingsModal from './components/SettingsModal';
+
 
 // Static Defaults
 const defaultHabitGroups = [
@@ -1225,33 +1225,10 @@ export default function App() {
     const [isRoutineOpen, setIsRoutineOpen] = useState(false);
     const [routineModalDay, setRoutineModalDay] = useState(new Date(2026, 5, 16));
     const [isBudgetOpen, setIsBudgetOpen] = useState(false);
-    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [wallpaper, setWallpaper] = useState(() => {
-        try {
-            return localStorage.getItem('aethel-wallpaper') || '';
-        } catch {
-            return '';
-        }
-    });
-
-    const handleSelectWallpaper = (val) => {
-        setWallpaper(val);
-        try {
-            localStorage.setItem('aethel-wallpaper', val);
-        } catch {}
-    };
-
-    const isDarkWallpaper = wallpaper && (
-        wallpaper.includes('mist') || 
-        wallpaper.includes('stars') || 
-        wallpaper.includes('photo-1506318137071') || 
-        wallpaper.includes('#1e293b')
-    );
 
     return (
         <div 
-            className={`h-screen flex flex-col antialiased select-none overflow-hidden relative transition-all duration-300 ${wallpaper ? 'has-wallpaper bg-cover bg-center' : 'bg-white'} ${isDarkWallpaper ? 'has-dark-wallpaper' : ''}`}
-            style={wallpaper ? { backgroundImage: wallpaper } : {}}
+            className="h-screen flex flex-col antialiased select-none overflow-hidden relative transition-all duration-300 bg-white"
         >
             {/* SVG Noise/Grain Texture Overlay (Global) */}
             <div className="absolute inset-0 pointer-events-none opacity-[0.035] z-40 mix-blend-overlay">
@@ -1376,9 +1353,6 @@ export default function App() {
                                 <i className="fa-solid fa-box-archive"></i>
                             </button>
                         )}
-                        <button onClick={() => setIsSettingsOpen(true)} className="hover:text-stone-700 transition" title="Settings">
-                            <i className="fa-solid fa-gear"></i>
-                        </button>
                     </div>
                 </nav>
             )}
@@ -1521,14 +1495,6 @@ export default function App() {
                 buckets={bucketsConfig}
                 onSaveBudget={handleSaveBudget}
                 onResetBudget={() => defaultBucketsConfig}
-            />
-
-            <SettingsModal
-                isOpen={isSettingsOpen}
-                onClose={() => setIsSettingsOpen(false)}
-                currentWallpaper={wallpaper}
-                onSelectWallpaper={handleSelectWallpaper}
-            />
-        </div>
+            />        </div>
     );
 }

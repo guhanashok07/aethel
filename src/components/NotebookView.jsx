@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import ContentBlock, { DEFAULT_WIDTH as STICKY_WIDTH, DEFAULT_HEIGHT as STICKY_HEIGHT } from './ContentBlock';
 
 const SIDEBAR_STORAGE_KEY = 'aethel-notebook-sidebar-open';
 
@@ -139,7 +138,6 @@ export default function NotebookView({
     const [linkQuery, setLinkQuery] = useState('');
     const [editingNotebookId, setEditingNotebookId] = useState('');
     const [selectionFontSize, setSelectionFontSize] = useState('');
-    const [activeBlockId, setActiveBlockId] = useState('');
 
     const editorRef = useRef(null);
     const fileInputRef = useRef(null);
@@ -147,7 +145,6 @@ export default function NotebookView({
     const saveTimerRef = useRef(null);
     const loadedPageIdRef = useRef('');
     const scrollContainerRef = useRef(null);
-    const blocksEndRef = useRef(null);
 
     const pagesByNotebook = useMemo(() => {
         const grouped = {};
@@ -322,60 +319,6 @@ export default function NotebookView({
     const toggleNotebookExpanded = (notebookId) => {
         setExpandedNotebooks((prev) => ({ ...prev, [notebookId]: !prev[notebookId] }));
     };
-
-    // Block CRUD
-    const pageBlocks = useMemo(() => {
-        return (activePage?.blocks || []).sort((a, b) => (a.order || 0) - (b.order || 0));
-    }, [activePage?.blocks]);
-
-    const handleAddBlock = () => {
-        if (!activePage) return;
-        const existingBlocks = activePage.blocks || [];
-        const containerWidth = editorRef.current?.clientWidth || 800;
-        const rightMargin = 24;
-        const x = Math.max(20, containerWidth - STICKY_WIDTH - rightMargin);
-
-        // Stack new stickies below any already sitting in the right-hand column
-        const rightColumnBlocks = existingBlocks.filter((b) => (b.x || 0) >= x - 40);
-        const y = rightColumnBlocks.length > 0
-            ? Math.max(...rightColumnBlocks.map((b) => (b.y || 0) + (b.height || STICKY_HEIGHT))) + 20
-            : 20;
-
-        const newBlock = {
-            id: 'block-' + Date.now(),
-            title: '',
-            content: '',
-            width: STICKY_WIDTH,
-            height: STICKY_HEIGHT,
-            x,
-            y,
-            order: Date.now(),
-            createdAt: new Date().toISOString()
-        };
-        onUpdatePage(activePage.id, { blocks: [...existingBlocks, newBlock] });
-        setActiveBlockId(newBlock.id);
-        // Auto-scroll to the new sticky after render
-        requestAnimationFrame(() => {
-            blocksEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-        });
-    };
-
-    const handleUpdateBlock = useCallback((blockId, updates) => {
-        if (!activePage) return;
-        const existingBlocks = activePage.blocks || [];
-        const updatedBlocks = existingBlocks.map(b =>
-            b.id === blockId ? { ...b, ...updates } : b
-        );
-        onUpdatePage(activePage.id, { blocks: updatedBlocks });
-    }, [activePage, onUpdatePage]);
-
-    const handleDeleteBlock = useCallback((blockId) => {
-        if (!activePage) return;
-        const existingBlocks = activePage.blocks || [];
-        const updatedBlocks = existingBlocks.filter(b => b.id !== blockId);
-        onUpdatePage(activePage.id, { blocks: updatedBlocks });
-        if (activeBlockId === blockId) setActiveBlockId('');
-    }, [activePage, onUpdatePage, activeBlockId]);
 
     const runCommand = (command, value = null) => {
         if (!activePage) return;
@@ -824,14 +767,6 @@ export default function NotebookView({
                                             onChange={handleFileChange}
                                         />
                                         <button
-                                            onClick={handleAddBlock}
-                                            className="h-9 px-3 rounded-full bg-stone-50/80 border border-stone-200/50 text-stone-500 hover:text-stone-850 hover:bg-white transition flex items-center gap-2"
-                                            title="Add sticky note"
-                                        >
-                                            <i className="fa-solid fa-note-sticky text-[11px]"></i>
-                                            <span className="text-[10px] font-mono uppercase tracking-wider">Sticky</span>
-                                        </button>
-                                        <button
                                             onClick={() => fileInputRef.current?.click()}
                                             className="h-9 px-3 rounded-full bg-stone-800 text-white text-[10px] font-mono uppercase tracking-wider hover:bg-stone-700 transition flex items-center gap-2"
                                         >
@@ -851,37 +786,14 @@ export default function NotebookView({
                                         onInput={queueContentSave}
                                         onBlur={flushContentSave}
                                         onPaste={handlePaste}
-                                        onClick={(e) => {
-                                            handleEditorClick(e);
-                                            setActiveBlockId('');
-                                        }}
+                                        onClick={handleEditorClick}
                                         onKeyDown={handleEditorKeyDown}
                                         onDragStart={handleDragStart}
                                         onDragEnd={handleDragEnd}
                                         onDrop={handleDrop}
                                         className={`notebook-page-editor outline-none text-stone-750 min-h-full ${widthMode === 'full' ? 'is-full-width' : 'is-center-width'} is-${fontSize} ${isEmpty ? 'is-empty' : ''}`}
                                         placeholder="Start writing..."
-                                    />
-
-                                    {/* Content Blocks */}
-                                    {pageBlocks.length > 0 && (
-                                        <div className="content-blocks-section">
-                                            {pageBlocks.map((block) => (
-                                                <ContentBlock
-                                                    key={block.id}
-                                                    block={block}
-                                                    onUpdate={handleUpdateBlock}
-                                                    onDelete={handleDeleteBlock}
-                                                    isActive={activeBlockId === block.id}
-                                                    onFocus={setActiveBlockId}
-                                                    fontSize={fontSize}
-                                                    canvasWidth={editorRef.current?.clientWidth || 800}
-                                                />
-                                            ))}
-                                            <div ref={blocksEndRef} />
-                                        </div>
-                                    )}
-                                </div>
+                                    />                                </div>
                             </div>
                         </>
                     ) : (
