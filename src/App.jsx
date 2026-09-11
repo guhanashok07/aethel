@@ -423,6 +423,7 @@ export default function App() {
         const dateStr = selectedDate.toLocaleDateString('sv-SE');
         const dateObj = new Date(dateStr + 'T00:00:00');
         const dayOfWeek = dateObj.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
         const specific = scheduleBlocksMapped.filter(e => e.date === dateStr);
         const templates = isWeekend ? [] : scheduleBlocksMapped.filter(e => !e.date);
 
@@ -1253,6 +1254,11 @@ export default function App() {
 
     const timelineDays = getTimelineStructure();
 
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [isRoutineOpen, setIsRoutineOpen] = useState(false);
+    const [routineModalDay, setRoutineModalDay] = useState(new Date(2026, 5, 16));
+    const [isBudgetOpen, setIsBudgetOpen] = useState(false);
+
     // Keyboard event listener for Undo/Redo
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -1270,11 +1276,6 @@ export default function App() {
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [handleUndo, handleRedo, activeView, isArchiveOpen, isRoutineOpen, isBudgetOpen]);
-
-    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
-    const [isRoutineOpen, setIsRoutineOpen] = useState(false);
-    const [routineModalDay, setRoutineModalDay] = useState(new Date(2026, 5, 16));
-    const [isBudgetOpen, setIsBudgetOpen] = useState(false);
 
     return (
         <div 
