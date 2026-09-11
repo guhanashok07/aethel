@@ -6,13 +6,13 @@ export default function HomeView({ onNavigate }) {
 
             {/* Breathing OS Radial Pulse (Background Glows with staggered out-of-phase animations) */}
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none home-auras-container">
-                {/* Coral Aura — starts immediately */}
+                {/* Coral Aura - starts immediately */}
                 <div className="absolute top-12 left-10 w-[450px] h-[450px] rounded-full bg-gradient-to-br from-rose-200 via-rose-300/60 to-orange-200/50 blur-[110px] animate-breathe-coral" style={{ animationDelay: '0s' }}></div>
-                {/* Indigo/Lavender Aura — offset by 5s so it's fading in while coral fades out */}
+                {/* Indigo/Lavender Aura - offset by 5s so it is fading in while coral fades out */}
                 <div className="absolute -bottom-20 -left-20 w-[550px] h-[550px] rounded-full bg-gradient-to-tr from-indigo-100 via-purple-200/50 to-pink-100 blur-[120px] animate-breathe-indigo" style={{ animationDelay: '-5s' }}></div>
-                {/* Mint/Green Aura — offset by 9s */}
+                {/* Mint/Green Aura - offset by 9s */}
                 <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] rounded-full bg-gradient-to-br from-[#c9e4de] to-[#dbf3c6]/40 blur-[100px] animate-breathe-mint" style={{ animationDelay: '-9s' }}></div>
-                {/* Marigold/Gold Aura — offset by 3s */}
+                {/* Marigold/Gold Aura - offset by 3s */}
                 <div className="absolute bottom-1/4 right-10 w-[400px] h-[400px] rounded-full bg-gradient-to-tr from-amber-100 via-orange-200/50 to-rose-200/30 blur-[110px] animate-breathe-gold" style={{ animationDelay: '-3s' }}></div>
             </div>
 
@@ -48,22 +48,13 @@ export default function HomeView({ onNavigate }) {
                         <span className="h-[1px] w-8 bg-stone-300/80 my-1"></span>
                         
                         <h2 className="text-2xl sm:text-3xl md:text-4xl font-cormorant font-normal italic text-stone-600 leading-relaxed max-w-xl">
-                            Hey GG! What are you working on today?
+                            Hey there! What are you working on today?
                         </h2>
                     </div>
                 </div>
 
                 {/* Lowercase Typography Link Gateways */}
                 <div className="flex items-center gap-8 mt-6">
-                    <button 
-                        className="font-cormorant font-normal italic text-2xl md:text-3xl text-stone-300/60 hover:text-stone-400/80 tracking-wider relative cursor-not-allowed py-1 transition-colors duration-300"
-                        title="Goals (Coming Soon)"
-                    >
-                        goals
-                    </button>
-
-                    <span className="text-stone-300 font-light text-xl select-none font-cormorant">/</span>
-                    
                     <button 
                         onClick={() => onNavigate('board')}
                         className="font-cormorant font-normal italic text-2xl md:text-3xl text-stone-400 hover:text-stone-900 tracking-wider relative group py-1 transition-colors duration-300"
@@ -84,15 +75,6 @@ export default function HomeView({ onNavigate }) {
 
                     <span className="text-stone-300 font-light text-xl select-none font-cormorant">/</span>
                     
-                    <button 
-                        className="font-cormorant font-normal italic text-2xl md:text-3xl text-stone-300/60 hover:text-stone-400/80 tracking-wider relative cursor-not-allowed py-1 transition-colors duration-300"
-                        title="Ideas (Coming Soon)"
-                    >
-                        ideas
-                    </button>
-
-                    <span className="text-stone-300 font-light text-xl select-none font-cormorant">/</span>
-                    
                     <button
                         onClick={() => onNavigate('notebook')}
                         className="font-cormorant font-normal italic text-2xl md:text-3xl text-stone-400 hover:text-stone-900 tracking-wider relative group py-1 transition-colors duration-300"
@@ -109,24 +91,6 @@ export default function HomeView({ onNavigate }) {
                     >
                         vault
                         <span className="absolute bottom-0 left-0 w-0 h-[1px] bg-stone-900 transition-all duration-300 group-hover:w-full"></span>
-                    </button>
-
-                    <span className="text-stone-300 font-light text-xl select-none font-cormorant">/</span>
-
-                    <button
-                        className="font-cormorant font-normal italic text-2xl md:text-3xl text-stone-300/60 hover:text-stone-400/80 tracking-wider relative cursor-not-allowed py-1 transition-colors duration-300"
-                        title="Reading (Coming Soon)"
-                    >
-                        reading
-                    </button>
-
-                    <span className="text-stone-300 font-light text-xl select-none font-cormorant">/</span>
-                    
-                    <button 
-                        className="font-cormorant font-normal italic text-2xl md:text-3xl text-stone-300/60 hover:text-stone-400/80 tracking-wider relative cursor-not-allowed py-1 transition-colors duration-300"
-                        title="Job Search (Coming Soon)"
-                    >
-                        job search
                     </button>
                 </div>
 

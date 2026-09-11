@@ -12,7 +12,7 @@ const CATEGORY_COLORS = {
 const HOURS = [6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1, 2, 3, 4, 5];
 
 // ──────────────────────────────────────────────
-// Habits Widget — grouped accordion
+// Habits Widget - grouped accordion
 // ──────────────────────────────────────────────
 function HabitsWidget({ habitGroups, onToggleItem }) {
     const [openGroups, setOpenGroups] = useState({});
@@ -151,11 +151,9 @@ export default function TimetableGrid({
         const dateObj = new Date(dateStr + 'T00:00:00');
         const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 6 is Saturday
         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-        const limitDate = new Date('2026-08-14T23:59:59');
-        const isPastLimit = dateObj > limitDate;
 
         const specific = dailyScheduleTemplate.filter(e => e.date === dateStr);
-        const templates = (isWeekend || isPastLimit) ? [] : dailyScheduleTemplate.filter(e => !e.date);
+        const templates = isWeekend ? [] : dailyScheduleTemplate.filter(e => !e.date);
 
         // Filter out templates that have a specific override marked as 'cancelled'
         const cancelledIds = specific.filter(e => e.status === 'cancelled').map(e => e.templateId);
@@ -213,7 +211,7 @@ export default function TimetableGrid({
                 {/* Left side: Widgets (Habits & Deadlines) */}
                 <div className="lg:col-span-4 flex flex-col gap-6 h-full overflow-y-auto scroll-hidden pr-1 pb-12 select-none">
                     
-                    {/* Widget A: Habits — Grouped Accordion */}
+                    {/* Widget A: Habits - Grouped Accordion */}
                     {(filter === 'all' || filter === 'habit') && (
                         <HabitsWidget
                             habitGroups={habitGroups}

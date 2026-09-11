@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import BookmarksGraphView from './BookmarksGraphView';
 
 const KIND_CONNECTOR = 'connector';
 const KIND_LINK = 'link';
@@ -63,7 +64,7 @@ function NodeForm({ initialTitle = '', initialKind = KIND_CONNECTOR, initialUrl 
                         type="button"
                         onClick={() => !hasChildren && setKind(KIND_LINK)}
                         disabled={hasChildren}
-                        title={hasChildren ? 'Has nested items — remove them first to convert to a link' : ''}
+                        title={hasChildren ? 'Has nested items - remove them first to convert to a link' : ''}
                         className={`h-7 px-2.5 rounded-full text-[9px] font-mono uppercase tracking-wider transition ${kind === KIND_LINK ? 'bg-stone-800 text-white' : 'text-stone-400 hover:text-stone-700'} ${hasChildren ? 'opacity-30 cursor-not-allowed' : ''}`}
                     >
                         Link
@@ -121,7 +122,7 @@ function BookmarkRow({ node, depth, childrenByParent, visibleIds, matchedIds, on
             setCopied(true);
             setTimeout(() => setCopied(false), 1200);
         } catch {
-            // clipboard unavailable — silently ignore
+            // clipboard unavailable - silently ignore
         }
     };
 
@@ -261,6 +262,7 @@ function BookmarkRow({ node, depth, childrenByParent, visibleIds, matchedIds, on
 
 export default function BookmarksApp({ nodes, onAdd, onUpdate, onDelete, onBack }) {
     const [query, setQuery] = useState('');
+    const [viewMode, setViewMode] = useState('graph');
     const [editingId, setEditingId] = useState('');
     const [addingParentId, setAddingParentId] = useState('');
 
@@ -331,17 +333,40 @@ export default function BookmarksApp({ nodes, onAdd, onUpdate, onDelete, onBack 
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
+                        {/* View Switcher: Graph / Tree */}
+                        <div className="flex items-center bg-white/70 border border-stone-200/60 rounded-full p-0.5">
+                            <button
+                                onClick={() => setViewMode('graph')}
+                                title="Interactive Graph View"
+                                className={`h-8 px-3 rounded-full text-[10px] font-mono uppercase tracking-wider transition flex items-center gap-1.5 ${viewMode === 'graph' ? 'bg-stone-800 text-white shadow-xs' : 'text-stone-400 hover:text-stone-700'}`}
+                            >
+                                <i className="fa-solid fa-circle-nodes text-[10px]"></i>
+                                <span>Graph</span>
+                            </button>
+                            <button
+                                onClick={() => setViewMode('tree')}
+                                title="List Tree View"
+                                className={`h-8 px-3 rounded-full text-[10px] font-mono uppercase tracking-wider transition flex items-center gap-1.5 ${viewMode === 'tree' ? 'bg-stone-800 text-white shadow-xs' : 'text-stone-400 hover:text-stone-700'}`}
+                            >
+                                <i className="fa-solid fa-folder-tree text-[10px]"></i>
+                                <span>Tree</span>
+                            </button>
+                        </div>
+
                         <div className="relative">
                             <i className="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-stone-300 text-[11px]"></i>
                             <input
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
                                 placeholder="Search bookmarks"
-                                className="w-52 h-9 rounded-full bg-white/70 border border-stone-200/60 pl-9 pr-3 text-xs text-stone-700 placeholder:text-stone-400 outline-none focus:border-stone-300"
+                                className="w-48 h-9 rounded-full bg-white/70 border border-stone-200/60 pl-9 pr-3 text-xs text-stone-700 placeholder:text-stone-400 outline-none focus:border-stone-300"
                             />
                         </div>
                         <button
-                            onClick={() => setAddingParentId('root')}
+                            onClick={() => {
+                                setViewMode('tree');
+                                setAddingParentId('root');
+                            }}
                             className="h-9 px-3 rounded-full bg-stone-800 text-white text-[10px] font-mono uppercase tracking-wider hover:bg-stone-700 transition flex items-center gap-2 shrink-0"
                         >
                             <i className="fa-solid fa-plus text-[10px]"></i> New Root
@@ -349,55 +374,66 @@ export default function BookmarksApp({ nodes, onAdd, onUpdate, onDelete, onBack 
                     </div>
                 </header>
 
-                <div className="flex-1 min-h-0 bg-white/58 backdrop-blur-xl border border-stone-200/45 shadow-sm rounded-[28px] overflow-y-auto scroll-hidden p-5">
-                    {addingParentId === 'root' && (
-                        <div className="pb-2">
-                            <NodeForm
-                                submitLabel="Add"
-                                onSubmit={(vals) => { onAdd('', vals); setAddingParentId(''); }}
-                                onCancel={() => setAddingParentId('')}
+                <div className="flex-1 min-h-0 bg-white/58 backdrop-blur-xl border border-stone-200/45 shadow-sm rounded-[28px] overflow-hidden flex flex-col p-4 md:p-5">
+                    {viewMode === 'graph' ? (
+                        <div className="flex-1 min-h-0 w-full h-full">
+                            <BookmarksGraphView
+                                nodes={nodes}
+                                query={query}
                             />
                         </div>
-                    )}
+                    ) : (
+                        <div className="flex-1 min-h-0 overflow-y-auto scroll-hidden">
+                            {addingParentId === 'root' && (
+                                <div className="pb-2">
+                                    <NodeForm
+                                        submitLabel="Add"
+                                        onSubmit={(vals) => { onAdd('', vals); setAddingParentId(''); }}
+                                        onCancel={() => setAddingParentId('')}
+                                    />
+                                </div>
+                            )}
 
-                    {rootNodes.filter((n) => !visibleIds || visibleIds.has(n.id)).map((node) => (
-                        <BookmarkRow
-                            key={node.id}
-                            node={node}
-                            depth={0}
-                            childrenByParent={childrenByParent}
-                            visibleIds={visibleIds}
-                            matchedIds={matchedIds}
-                            onAdd={onAdd}
-                            onUpdate={onUpdate}
-                            onDelete={handleDeleteWithConfirm}
-                            editingId={editingId}
-                            setEditingId={setEditingId}
-                            addingParentId={addingParentId}
-                            setAddingParentId={setAddingParentId}
-                        />
-                    ))}
+                            {rootNodes.filter((n) => !visibleIds || visibleIds.has(n.id)).map((node) => (
+                                <BookmarkRow
+                                    key={node.id}
+                                    node={node}
+                                    depth={0}
+                                    childrenByParent={childrenByParent}
+                                    visibleIds={visibleIds}
+                                    matchedIds={matchedIds}
+                                    onAdd={onAdd}
+                                    onUpdate={onUpdate}
+                                    onDelete={handleDeleteWithConfirm}
+                                    editingId={editingId}
+                                    setEditingId={setEditingId}
+                                    addingParentId={addingParentId}
+                                    setAddingParentId={setAddingParentId}
+                                />
+                            ))}
 
-                    {rootNodes.length === 0 && addingParentId !== 'root' && (
-                        <div className="flex flex-col items-center justify-center text-center py-16">
-                            <div className="w-11 h-11 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-400 mb-4">
-                                <i className="fa-solid fa-diagram-project text-base"></i>
-                            </div>
-                            <h2 className="font-cormorant italic text-2xl text-stone-800 mb-1.5">an empty vault</h2>
-                            <p className="text-xs text-stone-400 max-w-xs leading-relaxed mb-5">
-                                Start a root item — a project, or place — then nest folders and links underneath it.
-                            </p>
-                            <button
-                                onClick={() => setAddingParentId('root')}
-                                className="h-9 px-4 rounded-full bg-stone-800 text-white text-[10px] font-mono uppercase tracking-wider hover:bg-stone-700 transition"
-                            >
-                                Create first item
-                            </button>
+                            {rootNodes.length === 0 && addingParentId !== 'root' && (
+                                <div className="flex flex-col items-center justify-center text-center py-16">
+                                    <div className="w-11 h-11 rounded-2xl bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-400 mb-4">
+                                        <i className="fa-solid fa-diagram-project text-base"></i>
+                                    </div>
+                                    <h2 className="font-cormorant italic text-2xl text-stone-800 mb-1.5">an empty vault</h2>
+                                    <p className="text-xs text-stone-400 max-w-xs leading-relaxed mb-5">
+                                        Start a root item: a project, or place, then nest folders and links underneath it.
+                                    </p>
+                                    <button
+                                        onClick={() => setAddingParentId('root')}
+                                        className="h-9 px-4 rounded-full bg-stone-800 text-white text-[10px] font-mono uppercase tracking-wider hover:bg-stone-700 transition"
+                                    >
+                                        Create first item
+                                    </button>
+                                </div>
+                            )}
+
+                            {query.trim() && visibleIds && visibleIds.size === 0 && (
+                                <p className="text-center py-10 text-[10px] font-mono uppercase tracking-wider text-stone-400">No matches found.</p>
+                            )}
                         </div>
-                    )}
-
-                    {query.trim() && visibleIds && visibleIds.size === 0 && (
-                        <p className="text-center py-10 text-[10px] font-mono uppercase tracking-wider text-stone-400">No matches found.</p>
                     )}
                 </div>
             </div>

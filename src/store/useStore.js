@@ -10,17 +10,28 @@ const defaultBucketsConfig = {
 };
 
 const defaultScheduleTemplate = [
-    { id: "sched-1", bucket: "buffer", startHour: 9.0, endHour: 9.5, name: "Daily Standup & Sprint Sync" },
-    { id: "sched-2", bucket: "execution", startHour: 9.5, endHour: 12.0, name: "Deep Work: PRD & Architecture Specs" },
-    { id: "sched-3", bucket: "buffer", startHour: 12.0, endHour: 13.0, name: "Lunch & Informal 1:1s" },
-    { id: "sched-4", bucket: "discovery", startHour: 13.0, endHour: 15.0, name: "Customer Discovery & User Testing Calls" },
-    { id: "sched-5", bucket: "execution", startHour: 15.0, endHour: 16.5, name: "Design Critique & Prototype Review (Figma)" },
-    { id: "sched-6", bucket: "analytics", startHour: 16.5, endHour: 17.5, name: "Funnel Analysis & Metrics Deep-Dive" },
-    { id: "sched-7", bucket: "strategy", startHour: 17.5, endHour: 18.5, name: "EOD Wrap-Up & Roadmap Prioritization" }
+    { id: "sched-1", bucket: "work", type: "block", startHour: 6.5, endHour: 7.5, name: "Product Metrics & Roadmap Review" },
+    { id: "sched-2", bucket: "routine", type: "block", startHour: 7.5, endHour: 8.5, name: "Morning Routine & Breakfast" },
+    { id: "sched-3", bucket: "work", type: "block", startHour: 8.5, endHour: 11.5, name: "Deep Work: PRD & Architecture Specs" },
+    { id: "sched-4", bucket: "work", type: "meeting", startHour: 11.5, endHour: 12.5, name: "Daily Standup & Sprint Sync" },
+    { id: "sched-5", bucket: "routine", type: "block", startHour: 12.5, endHour: 13.5, name: "Lunch & Walk" },
+    { id: "sched-6", bucket: "work", type: "meeting", startHour: 13.5, endHour: 15.5, name: "Customer Discovery & User Testing Calls" },
+    { id: "sched-7", bucket: "work", type: "meeting", startHour: 15.5, endHour: 16.5, name: "Design Critique: Prototype Review (Figma)" },
+    { id: "sched-8", bucket: "fitness", type: "block", startHour: 16.5, endHour: 18.0, name: "Gym & Movement" },
+    { id: "sched-9", bucket: "margin", type: "block", startHour: 18.0, endHour: 18.5, name: "Quick Buffer & Comms" },
+    { id: "sched-10", bucket: "startup", type: "block", startHour: 18.5, endHour: 20.5, name: "Side Project MVP Building" },
+    { id: "sched-11", bucket: "routine", type: "block", startHour: 21.0, endHour: 22.5, name: "Evening Wind Down & Reading" },
+    { id: "sched-12", bucket: "sleep", type: "block", startHour: 23.5, endHour: 30.0, name: "Sleep & Recovery" }
 ];
 
 const getSeedData = () => {
     const now = new Date().toISOString();
+    const today = new Date();
+    const formatDateStr = (offsetDays) => {
+        const d = new Date(today);
+        d.setDate(today.getDate() + offsetDays);
+        return d.toLocaleDateString('sv-SE');
+    };
 
     const entities = [
         // Buckets config
@@ -59,8 +70,8 @@ const getSeedData = () => {
         { id: 'task-12', type: 'task', title: 'Prepare GTM positioning brief and sales battlecard', createdAt: now, updatedAt: now, properties: { bucketId: 'analytics', status: 'active', order: 1 } },
         { id: 'task-13', type: 'task', title: 'Weekly executive dashboard: cohort retention and churn', createdAt: now, updatedAt: now, properties: { bucketId: 'analytics', status: 'done', order: 2 } },
 
-        // Schedule events
-        ...defaultScheduleTemplate.map(block => ({
+        // 1. Recurring Schedule Template Blocks (Monday-Friday)
+        ...defaultScheduleTemplate.map((block) => ({
             id: block.id,
             type: 'event',
             title: block.name,
@@ -68,10 +79,150 @@ const getSeedData = () => {
             updatedAt: now,
             properties: {
                 bucketKey: block.bucket,
+                type: block.type || 'block',
                 startHour: block.startHour,
-                endHour: block.endHour
+                endHour: block.endHour,
+                date: '',
+                completed: false
             }
         })),
+
+        // 2. Specific dated calendar events for today and surrounding days
+        {
+            id: 'event-today-1',
+            type: 'event',
+            title: 'Sprint 24 Planning & Backlog Grooming',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                bucketKey: 'work',
+                type: 'meeting',
+                startHour: 10.0,
+                endHour: 11.3,
+                date: formatDateStr(0),
+                completed: false
+            }
+        },
+        {
+            id: 'event-today-2',
+            type: 'event',
+            title: 'Design Review: Mobile IA & Navigation',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                bucketKey: 'work',
+                type: 'meeting',
+                startHour: 14.0,
+                endHour: 15.0,
+                date: formatDateStr(0),
+                completed: false
+            }
+        },
+        {
+            id: 'event-today-3',
+            type: 'event',
+            title: 'PRD Sign-off with Tech Lead',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                bucketKey: 'work',
+                type: 'deadline',
+                startHour: 17.0,
+                endHour: 17.5,
+                date: formatDateStr(0),
+                completed: false
+            }
+        },
+        {
+            id: 'event-tomorrow-1',
+            type: 'event',
+            title: 'Executive Demo: Multi-Agent Workflow',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                bucketKey: 'work',
+                type: 'meeting',
+                startHour: 11.0,
+                endHour: 12.0,
+                date: formatDateStr(1),
+                completed: false
+            }
+        },
+        {
+            id: 'event-tomorrow-2',
+            type: 'event',
+            title: 'Customer Validation: Enterprise Beta Cohort',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                bucketKey: 'work',
+                type: 'meeting',
+                startHour: 14.5,
+                endHour: 15.5,
+                date: formatDateStr(1),
+                completed: false
+            }
+        },
+        {
+            id: 'event-tomorrow-3',
+            type: 'event',
+            title: 'Release Candidate v1.2 Code Freeze',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                bucketKey: 'work',
+                type: 'deadline',
+                startHour: 17.0,
+                endHour: 17.5,
+                date: formatDateStr(1),
+                completed: false
+            }
+        },
+        {
+            id: 'event-past-1',
+            type: 'event',
+            title: 'Weekly Product All-Hands & Demo',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                bucketKey: 'work',
+                type: 'meeting',
+                startHour: 10.0,
+                endHour: 11.0,
+                date: formatDateStr(-1),
+                completed: true
+            }
+        },
+        {
+            id: 'event-future-1',
+            type: 'event',
+            title: 'Architecture Spike: Knowledge Graph Engine',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                bucketKey: 'work',
+                type: 'block',
+                startHour: 9.5,
+                endHour: 11.5,
+                date: formatDateStr(2),
+                completed: false
+            }
+        },
+        {
+            id: 'event-future-2',
+            type: 'event',
+            title: 'Weekend Trail Run & Fitness Recovery',
+            createdAt: now,
+            updatedAt: now,
+            properties: {
+                bucketKey: 'fitness',
+                type: 'block',
+                startHour: 9.0,
+                endHour: 11.0,
+                date: formatDateStr(3),
+                completed: false
+            }
+        },
 
         // Notebooks
         { id: 'nb-1', type: 'notebook', title: 'Product Discovery Playbook', createdAt: now, updatedAt: now, properties: { order: 0 } },
@@ -103,18 +254,40 @@ const getSeedData = () => {
             }
         },
 
-        // Bookmarks / Knowledge Graph
-        { id: 'bm-root', type: 'bookmark_node', title: 'Knowledge Vault', createdAt: now, updatedAt: now, properties: { parentId: '' } },
-        { id: 'bm-1', type: 'bookmark_node', title: 'Reforge Product Strategy Stack', createdAt: now, updatedAt: now, properties: { parentId: 'bm-root', url: 'https://www.reforge.com' } },
-        { id: 'bm-2', type: 'bookmark_node', title: 'Heuristic Evaluation Guidelines (NN/g)', createdAt: now, updatedAt: now, properties: { parentId: 'bm-root', url: 'https://www.nngroup.com' } },
-        { id: 'bm-3', type: 'bookmark_node', title: 'Anthropic Building Effective Agents', createdAt: now, updatedAt: now, properties: { parentId: 'bm-root', url: 'https://anthropic.com' } },
-        { id: 'bm-4', type: 'bookmark_node', title: 'Amplitude Product Analytics Handbook', createdAt: now, updatedAt: now, properties: { parentId: 'bm-root', url: 'https://amplitude.com' } }
+        // Bookmarks / Knowledge Graph Categories
+        { id: 'bm-fld-pm', type: 'bookmark_node', title: 'Product Strategy & Management', createdAt: now, updatedAt: now, properties: { parentId: '', kind: 'connector', order: 0 } },
+        { id: 'bm-fld-ai', type: 'bookmark_node', title: 'AI & Intelligent Systems', createdAt: now, updatedAt: now, properties: { parentId: '', kind: 'connector', order: 1 } },
+        { id: 'bm-fld-ux', type: 'bookmark_node', title: 'Design & User Research', createdAt: now, updatedAt: now, properties: { parentId: '', kind: 'connector', order: 2 } },
+        { id: 'bm-fld-eng', type: 'bookmark_node', title: 'Engineering & Architecture', createdAt: now, updatedAt: now, properties: { parentId: '', kind: 'connector', order: 3 } },
+
+        // PM Bookmarks
+        { id: 'bm-pm-1', type: 'bookmark_node', title: 'Reforge Product Strategy Stack', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-pm', kind: 'link', url: 'https://www.reforge.com', order: 0 } },
+        { id: 'bm-pm-2', type: 'bookmark_node', title: 'Lenny Newsletter Benchmarks', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-pm', kind: 'link', url: 'https://www.lennysnewsletter.com', order: 1 } },
+        { id: 'bm-pm-3', type: 'bookmark_node', title: 'Amplitude Analytics Handbook', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-pm', kind: 'link', url: 'https://amplitude.com', order: 2 } },
+        { id: 'bm-pm-4', type: 'bookmark_node', title: 'Continuous Discovery Framework', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-pm', kind: 'link', url: 'https://www.producttalk.org', order: 3 } },
+
+        // AI Bookmarks
+        { id: 'bm-ai-1', type: 'bookmark_node', title: 'Anthropic Building Effective Agents', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-ai', kind: 'link', url: 'https://anthropic.com/research/building-effective-agents', order: 0 } },
+        { id: 'bm-ai-2', type: 'bookmark_node', title: 'Hugging Face Open LLM Leaderboard', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-ai', kind: 'link', url: 'https://huggingface.co/spaces/open-llm-leaderboard', order: 1 } },
+        { id: 'bm-ai-3', type: 'bookmark_node', title: 'Google DeepMind Publications', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-ai', kind: 'link', url: 'https://deepmind.google/research', order: 2 } },
+        { id: 'bm-ai-4', type: 'bookmark_node', title: 'Vercel AI SDK Core Concepts', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-ai', kind: 'link', url: 'https://sdk.vercel.ai', order: 3 } },
+
+        // UX Bookmarks
+        { id: 'bm-ux-1', type: 'bookmark_node', title: 'NN/g Usability Heuristics', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-ux', kind: 'link', url: 'https://www.nngroup.com/articles/ten-usability-heuristics/', order: 0 } },
+        { id: 'bm-ux-2', type: 'bookmark_node', title: 'Mobbin Mobile Flow Patterns', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-ux', kind: 'link', url: 'https://mobbin.com', order: 1 } },
+        { id: 'bm-ux-3', type: 'bookmark_node', title: 'Laws of UX Psychology Principles', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-ux', kind: 'link', url: 'https://lawsofux.com', order: 2 } },
+
+        // Engineering Bookmarks
+        { id: 'bm-eng-1', type: 'bookmark_node', title: 'System Design Primer', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-eng', kind: 'link', url: 'https://github.com/donnemartin/system-design-primer', order: 0 } },
+        { id: 'bm-eng-2', type: 'bookmark_node', title: 'Martin Fowler Architecture Guide', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-eng', kind: 'link', url: 'https://martinfowler.com', order: 1 } },
+        { id: 'bm-eng-3', type: 'bookmark_node', title: 'Tailwind CSS Component Docs', createdAt: now, updatedAt: now, properties: { parentId: 'bm-fld-eng', kind: 'link', url: 'https://tailwindcss.com', order: 2 } }
     ];
 
     const relations = [
         { id: 'rel-1', sourceId: 'task-1', targetId: 'note-2', type: 'references' },
         { id: 'rel-2', sourceId: 'task-5', targetId: 'note-1', type: 'references' },
-        { id: 'rel-3', sourceId: 'bm-1', targetId: 'nb-1', type: 'relates_to' }
+        { id: 'rel-3', sourceId: 'bm-pm-1', targetId: 'nb-1', type: 'relates_to' },
+        { id: 'rel-4', sourceId: 'bm-ai-1', targetId: 'nb-2', type: 'relates_to' }
     ];
 
     return { entities, relations };
@@ -150,8 +323,18 @@ export const useStore = create((set, get) => ({
                 localStorage.setItem(STORAGE_KEY_RELATIONS, JSON.stringify(relations));
                 set({ entities, relations });
             } else {
+                let parsedEntities = JSON.parse(rawEntities);
+                // Ensure schedule events and rich bookmarks are present if migrating from previous seed
+                const hasEvents = parsedEntities.some(e => e.type === 'event');
+                const hasFolders = parsedEntities.some(e => e.type === 'bookmark_node' && e.properties?.parentId === '');
+                if (!hasEvents || !hasFolders) {
+                    const seed = getSeedData();
+                    const nonExisting = seed.entities.filter(se => !parsedEntities.some(pe => pe.id === se.id));
+                    parsedEntities = [...parsedEntities, ...nonExisting];
+                    localStorage.setItem(STORAGE_KEY_ENTITIES, JSON.stringify(parsedEntities));
+                }
                 set({
-                    entities: JSON.parse(rawEntities),
+                    entities: parsedEntities,
                     relations: rawRelations ? JSON.parse(rawRelations) : []
                 });
             }

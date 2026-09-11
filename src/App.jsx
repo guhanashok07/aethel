@@ -20,9 +20,9 @@ const defaultHabitGroups = [
         icon: '☀️',
         items: [
             { id: 'water_am', label: 'Water', done: false },
-            { id: 'skincare_vitc', label: 'Skin care — Vitamin C / Niacinamide', done: false },
-            { id: 'skincare_moist', label: 'Skin care — Moisturizer & sunscreen', done: false },
-            { id: 'supplements', label: 'Supplements — Finasteride, Seeds, Gummies & Fish oil', done: false },
+            { id: 'skincare_vitc', label: 'Skin care: Vitamin C / Niacinamide', done: false },
+            { id: 'skincare_moist', label: 'Skin care: Moisturizer & sunscreen', done: false },
+            { id: 'supplements', label: 'Supplements: Finasteride, Seeds, Gummies & Fish oil', done: false },
         ]
     },
     {
@@ -54,7 +54,7 @@ const defaultHabitGroups = [
             { id: 'portfolio', label: 'Portfolio', done: false },
             { id: 'building', label: 'Building', done: false },
             { id: 'product_prep', label: 'Product prep', done: false },
-            { id: 'job_work', label: 'Job work — applications, interviews, networking', done: false },
+            { id: 'job_work', label: 'Job work: applications, interviews, networking', done: false },
             { id: 'tech_ld', label: 'Technical L&D', done: false },
             { id: 'vocab_comm', label: 'Vocab & communication', done: false },
             { id: 'startup_work', label: 'Startup Work', done: false },
@@ -86,17 +86,17 @@ const defaultBucketsConfig = {
 
 const defaultScheduleTemplate = [
     { id: "sleep-block-new", bucket: "sleep", startHour: 24.0, endHour: 30.0, name: "Sleep & Recovery" },
-    { id: "job-search-block", bucket: "work", startHour: 6.0, endHour: 7.0, name: "Job Search Work" },
-    { id: "morning-routine-block", bucket: "routine", startHour: 7.0, endHour: 8.5, name: "Morning Routine + Breakfast" },
-    { id: "internship-block", bucket: "work", startHour: 8.5, endHour: 12.5, name: "Internship / AGAI Research Work" },
-    { id: "lunch-block", bucket: "routine", startHour: 12.5, endHour: 13.0, name: "Lunch" },
-    { id: "rd-block", bucket: "work", startHour: 13.0, endHour: 15.5, name: "Product / Technical R&D" },
-    { id: "gym-block", bucket: "fitness", startHour: 16.0, endHour: 17.0, name: "Gym" },
-    { id: "snacks-misc-block", bucket: "margin", startHour: 17.0, endHour: 18.0, name: "Quick Snacks, Misc Work" },
-    { id: "startup-block", bucket: "startup", startHour: 18.0, endHour: 20.0, name: "Building / Startup Work" },
-    { id: "portfolio-block", bucket: "work", startHour: 20.0, endHour: 21.0, name: "Portfolio" },
-    { id: "pending-work-block", bucket: "work", startHour: 21.5, endHour: 23.0, name: "Day's Pending Work" },
-    { id: "night-routine-block", bucket: "routine", startHour: 23.0, endHour: 24.0, name: "Preparing for Next Day + Night Routine" }
+    { id: "pm-metrics-block", bucket: "work", startHour: 6.5, endHour: 7.5, name: "Product Metrics & Roadmap Review" },
+    { id: "morning-routine-block", bucket: "routine", startHour: 7.5, endHour: 8.5, name: "Morning Routine & Breakfast" },
+    { id: "deep-work-specs-block", bucket: "work", startHour: 8.5, endHour: 11.5, name: "Deep Work: PRDs & Feature Specs" },
+    { id: "team-sync-block", bucket: "work", startHour: 11.5, endHour: 12.5, name: "Team Sync & Cross-Functional Standup" },
+    { id: "lunch-block", bucket: "routine", startHour: 12.5, endHour: 13.5, name: "Lunch & Walk" },
+    { id: "discovery-block", bucket: "work", startHour: 13.5, endHour: 16.0, name: "Customer Discovery & User Testing" },
+    { id: "gym-block", bucket: "fitness", startHour: 16.0, endHour: 17.3, name: "Gym & Fitness" },
+    { id: "buffer-block", bucket: "margin", startHour: 17.3, endHour: 18.0, name: "Buffer & Communications" },
+    { id: "side-project-block", bucket: "startup", startHour: 18.0, endHour: 20.0, name: "Side Project MVP Building" },
+    { id: "reading-block", bucket: "work", startHour: 20.0, endHour: 21.5, name: "Reading & Industry Research" },
+    { id: "evening-wind-down", bucket: "routine", startHour: 22.0, endHour: 23.5, name: "Evening Wind Down & Planning" }
 ];
 
 const START_DATE = new Date(); // Current system time
@@ -154,10 +154,51 @@ export default function App() {
         pushToUndoStack
     } = useStore();
 
+    const navigateTo = (view, push = true) => {
+        setActiveView(view);
+        if (push) {
+            const targetHash = view === 'home' ? '' : `#${view}`;
+            if (window.location.hash !== targetHash) {
+                window.history.pushState({ view }, '', targetHash || window.location.pathname + window.location.search);
+            }
+        }
+    };
+
+    const handleBack = () => {
+        if (window.history.length > 1 && window.location.hash) {
+            window.history.back();
+        } else {
+            navigateTo('home');
+        }
+    };
+
     const openSchedule = () => {
         setCurrentScheduleView('day');
-        setActiveView('schedule');
+        navigateTo('schedule');
     };
+
+    // Synchronize browser history and hash navigation
+    useEffect(() => {
+        const handlePopState = (e) => {
+            const stateView = e.state?.view;
+            const hash = window.location.hash.replace(/^#\/?/, '');
+            const target = stateView || (hash && ['board', 'schedule', 'notebook', 'vault', 'home'].includes(hash) ? hash : 'home');
+            setActiveView(target);
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        window.addEventListener('hashchange', handlePopState);
+
+        const initialHash = window.location.hash.replace(/^#\/?/, '');
+        if (initialHash && ['board', 'schedule', 'notebook', 'vault'].includes(initialHash)) {
+            setActiveView(initialHash);
+        }
+
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            window.removeEventListener('hashchange', handlePopState);
+        };
+    }, []);
 
     // Init Auth on mount
     useEffect(() => {
@@ -303,7 +344,7 @@ export default function App() {
             });
     }, [entities]);
 
-    // 1.7. Vault — Bookmarks knowledge-graph nodes
+    // 1.7. Vault: Bookmarks knowledge-graph nodes
     const bookmarkNodesMapped = useMemo(() => {
         return entities
             .filter(e => e.type === 'bookmark_node')
@@ -341,20 +382,33 @@ export default function App() {
 
     // 7. Schedule blocks
     const scheduleBlocksMapped = useMemo(() => {
-        return entities
-            .filter(e => e.type === 'event')
-            .map(e => ({
-                id: e.id,
-                bucket: e.properties?.bucketKey || 'work',
-                startHour: e.properties?.startHour ?? 9.0,
-                endHour: e.properties?.endHour ?? 10.0,
-                name: e.title,
-                type: e.properties?.type || 'block',
-                date: e.properties?.date || '',
-                completed: e.properties?.completed || false,
-                status: e.properties?.status || '',
-                templateId: e.properties?.templateId || ''
+        const eventEntities = entities.filter(e => e.type === 'event');
+        if (eventEntities.length === 0) {
+            return defaultScheduleTemplate.map(b => ({
+                id: b.id,
+                bucket: b.bucket || 'work',
+                startHour: b.startHour ?? 9.0,
+                endHour: b.endHour ?? 10.0,
+                name: b.name,
+                type: 'block',
+                date: '',
+                completed: false,
+                status: '',
+                templateId: ''
             }));
+        }
+        return eventEntities.map(e => ({
+            id: e.id,
+            bucket: e.properties?.bucketKey || 'work',
+            startHour: e.properties?.startHour ?? 9.0,
+            endHour: e.properties?.endHour ?? 10.0,
+            name: e.title,
+            type: e.properties?.type || 'block',
+            date: e.properties?.date || '',
+            completed: e.properties?.completed || false,
+            status: e.properties?.status || '',
+            templateId: e.properties?.templateId || ''
+        }));
     }, [entities]);
 
     // 4. Reactive Allocation Buckets (sums block times dynamically for the selected date)
@@ -369,12 +423,8 @@ export default function App() {
         const dateStr = selectedDate.toLocaleDateString('sv-SE');
         const dateObj = new Date(dateStr + 'T00:00:00');
         const dayOfWeek = dateObj.getDay();
-        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-        const limitDate = new Date('2026-08-14T23:59:59');
-        const isPastLimit = dateObj > limitDate;
-
         const specific = scheduleBlocksMapped.filter(e => e.date === dateStr);
-        const templates = (isWeekend || isPastLimit) ? [] : scheduleBlocksMapped.filter(e => !e.date);
+        const templates = isWeekend ? [] : scheduleBlocksMapped.filter(e => !e.date);
 
         const cancelledIds = specific.filter(e => e.status === 'cancelled').map(e => e.templateId);
         const activeTemplates = templates.filter(e => !cancelledIds.includes(e.id));
@@ -424,8 +474,6 @@ export default function App() {
         const today = new Date();
         const dayOfWeek = today.getDay();
         const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-        const limitDate = new Date('2026-08-14T23:59:59');
-        const isPastLimit = today > limitDate;
 
         let adjustedHour = currentFloatHour;
         if (adjustedHour < 2.0) {
@@ -434,7 +482,7 @@ export default function App() {
 
         const todayStr = today.toLocaleDateString('sv-SE');
         const specific = scheduleBlocksMapped.filter(b => b.date === todayStr);
-        const templates = (isWeekend || isPastLimit) ? [] : scheduleBlocksMapped.filter(b => !b.date);
+        const templates = isWeekend ? [] : scheduleBlocksMapped.filter(b => !b.date);
 
         const merged = [...specific, ...templates];
         let active = merged.find(b => adjustedHour >= b.startHour && adjustedHour < b.endHour);
@@ -870,7 +918,7 @@ export default function App() {
     };
 
     // -------------------------------------------------------------
-    // Vault — Bookmarks knowledge-graph Actions (CRUD Entity wrappers)
+    // Vault: Bookmarks knowledge-graph Actions (CRUD Entity wrappers)
     // -------------------------------------------------------------
     const handleAddBookmarkNode = (parentId, { title, kind, url }) => {
         pushToUndoStack();
@@ -1215,11 +1263,13 @@ export default function App() {
             } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
                 e.preventDefault();
                 handleRedo();
+            } else if (e.key === 'Escape' && activeView !== 'home' && !isArchiveOpen && !isRoutineOpen && !isBudgetOpen) {
+                handleBack();
             }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [handleUndo, handleRedo]);
+    }, [handleUndo, handleRedo, activeView, isArchiveOpen, isRoutineOpen, isBudgetOpen]);
 
     const [isArchiveOpen, setIsArchiveOpen] = useState(false);
     const [isRoutineOpen, setIsRoutineOpen] = useState(false);
@@ -1271,18 +1321,26 @@ export default function App() {
             {activeView !== 'home' && (
                 <nav className="flex items-center justify-between px-8 py-3.5 bg-gradient-to-r from-rose-100/12 via-amber-100/8 to-indigo-100/12 backdrop-blur-2xl border-b border-stone-200/35 text-stone-700 fixed top-0 left-0 w-full z-50 shadow-sm shrink-0 select-none">
                     <div className="w-1/3 flex items-center justify-start gap-3">
-                        <span className="text-[10px] font-mono tracking-wider uppercase text-stone-400 font-bold animate-pulse-slow" id="current-date-display">
-                            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })} • {new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        <button
+                            onClick={handleBack}
+                            title="Go back (Esc)"
+                            className="group flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 hover:bg-white text-stone-600 hover:text-stone-900 border border-stone-200/60 transition-all duration-200 font-mono text-[10px] uppercase tracking-wider font-semibold shadow-xs cursor-pointer"
+                        >
+                            <i className="fa-solid fa-arrow-left text-[9px] group-hover:-translate-x-0.5 transition-transform duration-200"></i>
+                            <span>Back</span>
+                        </button>
+                        <span className="text-[10px] font-mono tracking-wider uppercase text-stone-400 font-bold hidden sm:inline-block animate-pulse-slow" id="current-date-display">
+                            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                         </span>
                         <span
                             id="cloud-sync-indicator"
-                            className={`text-[9px] font-mono tracking-wider uppercase text-stone-450 transition-opacity flex items-center gap-1 ${syncing ? 'opacity-100' : 'opacity-0'}`}
+                            className={`text-[9px] font-mono tracking-wider uppercase text-stone-450 transition-opacity hidden md:flex items-center gap-1 ${syncing ? 'opacity-100' : 'opacity-0'}`}
                         >
                             <i className="fa-solid fa-cloud"></i> Synced
                         </span>
                     </div>
 
-                    <div className="w-1/3 flex items-center justify-center gap-2.5 cursor-pointer group" onClick={() => setActiveView('home')}>
+                    <div className="w-1/3 flex items-center justify-center gap-2.5 cursor-pointer group" onClick={() => navigateTo('home')}>
                         <div className="w-1.5 h-1.5 rounded-full animate-alive-dot translate-y-[2px] transition-transform duration-300"></div>
                         <h1 className="text-xl font-cormorant font-normal italic tracking-wide text-stone-850 group-hover:text-stone-600 transition-colors">
                             aethel
@@ -1293,14 +1351,14 @@ export default function App() {
                         {/* Switch View Slash Tabs */}
                         <div className="flex items-center gap-3 text-[10px] font-mono uppercase tracking-wider mr-2">
                             <button
-                                onClick={() => setActiveView('home')}
+                                onClick={() => navigateTo('home')}
                                 className={`transition-colors duration-205 ${activeView === 'home' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
                             >
                                 home
                             </button>
                             <span className="text-stone-300 select-none">/</span>
                             <button
-                                onClick={() => setActiveView('board')}
+                                onClick={() => navigateTo('board')}
                                 className={`transition-colors duration-205 ${activeView === 'board' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
                             >
                                 board
@@ -1314,14 +1372,14 @@ export default function App() {
                             </button>
                             <span className="text-stone-300 select-none">/</span>
                             <button
-                                onClick={() => setActiveView('notebook')}
+                                onClick={() => navigateTo('notebook')}
                                 className={`transition-colors duration-205 ${activeView === 'notebook' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
                             >
                                 notebook
                             </button>
                             <span className="text-stone-300 select-none">/</span>
                             <button
-                                onClick={() => setActiveView('vault')}
+                                onClick={() => navigateTo('vault')}
                                 className={`transition-colors duration-205 ${activeView === 'vault' ? 'text-stone-850 font-medium' : 'text-stone-400 hover:text-stone-750'}`}
                             >
                                 vault
@@ -1365,7 +1423,7 @@ export default function App() {
                             openSchedule();
                             return;
                         }
-                        setActiveView(view);
+                        navigateTo(view);
                     }} />
                 )}
                 {activeView === 'board' && (
@@ -1449,6 +1507,7 @@ export default function App() {
                         onAddBookmark={handleAddBookmarkNode}
                         onUpdateBookmark={handleUpdateBookmarkNode}
                         onDeleteBookmark={handleDeleteBookmarkNode}
+                        onBack={() => navigateTo('home')}
                     />
                 )}
             </div>

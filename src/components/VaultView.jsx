@@ -28,7 +28,7 @@ const TILES = [
     }
 ];
 
-export default function VaultView({ bookmarkNodes, onAddBookmark, onUpdateBookmark, onDeleteBookmark }) {
+export default function VaultView({ bookmarkNodes, onAddBookmark, onUpdateBookmark, onDeleteBookmark, onBack }) {
     const [openApp, setOpenApp] = useState('');
 
     if (openApp === 'bookmarks') {
@@ -47,10 +47,18 @@ export default function VaultView({ bookmarkNodes, onAddBookmark, onUpdateBookma
         <main className="flex-1 overflow-y-auto scroll-hidden pt-20 px-4 md:px-6 pb-10 bg-transparent text-stone-800 font-sans">
             <div className="max-w-5xl mx-auto flex flex-col gap-7">
                 <header className="flex flex-col gap-1.5">
+                    {onBack && (
+                        <button
+                            onClick={onBack}
+                            className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-[0.2em] text-stone-400 hover:text-stone-700 transition mb-1 cursor-pointer w-fit"
+                        >
+                            <i className="fa-solid fa-arrow-left text-[9px]"></i> Home
+                        </button>
+                    )}
                     <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-stone-400">Aethel OS</span>
                     <h1 className="font-cormorant italic text-4xl md:text-5xl text-stone-850">Vault</h1>
                     <p className="text-sm text-stone-400 max-w-md">
-                        The quieter corners of your OS — small tools you reach for, just not every day.
+                        The quieter corners of your OS: small tools you reach for, just not every day.
                     </p>
                 </header>
 
