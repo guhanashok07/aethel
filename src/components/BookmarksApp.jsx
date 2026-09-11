@@ -331,6 +331,9 @@ export default function BookmarksApp({ nodes, onAdd, onUpdate, onDelete, onBack 
                         <p className="text-[10px] font-mono uppercase tracking-wider text-stone-400 mt-1">
                             {nodes.length} item{nodes.length === 1 ? '' : 's'} · {rootNodes.length} root{rootNodes.length === 1 ? '' : 's'}
                         </p>
+                        <p className="text-xs text-stone-500 mt-1 font-sans">
+                            Clicking on any node will redirect you to that link.
+                        </p>
                     </div>
                     <div className="flex items-center gap-2">
                         {/* View Switcher: Graph / Tree */}

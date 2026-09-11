@@ -64,14 +64,36 @@ export default function BookmarksGraphView({ nodes = [], query = '', onSelectNod
             }
         });
 
-        // Initialize positions in a circular layout
-        const total = gNodes.length;
-        const radius = Math.min(260, 20 + total * 14);
-        gNodes.forEach((n, idx) => {
-            const angle = (idx / total) * Math.PI * 2;
-            const dist = n.isConnector ? radius * 0.45 : radius * (0.8 + (idx % 3) * 0.12);
-            n.x = Math.cos(angle) * dist + (Math.random() - 0.5) * 20;
-            n.y = Math.sin(angle) * dist + (Math.random() - 0.5) * 20;
+        // Initialize positions: 4 quadrants for the root hubs with fan-out children
+        const roots = gNodes.filter((n) => n.isConnector && !n.parentId);
+        const rootAngles = [
+            -Math.PI * 0.75, // Top-Left: Design & UX
+            -Math.PI * 0.25, // Top-Right: Engineering
+            Math.PI * 0.75,  // Bottom-Left: AI Systems
+            Math.PI * 0.25   // Bottom-Right: Product Strategy
+        ];
+        const rootSpread = 220;
+
+        roots.forEach((root, i) => {
+            const angle = rootAngles[i % rootAngles.length];
+            root.x = Math.cos(angle) * rootSpread;
+            root.y = Math.sin(angle) * rootSpread;
+
+            const children = gNodes.filter((n) => n.parentId === root.id);
+            const childSpread = 135;
+            children.forEach((child, ci) => {
+                const childAngle = angle + ((ci - (children.length - 1) / 2) * 0.45);
+                child.x = root.x + Math.cos(childAngle) * childSpread + (Math.random() - 0.5) * 10;
+                child.y = root.y + Math.sin(childAngle) * childSpread + (Math.random() - 0.5) * 10;
+            });
+        });
+
+        // Any orphan or unparented links
+        const unparented = gNodes.filter((n) => !n.isConnector && (!n.parentId || !roots.some(r => r.id === n.parentId)));
+        unparented.forEach((n, idx) => {
+            const angle = (idx / Math.max(1, unparented.length)) * Math.PI * 2;
+            n.x = Math.cos(angle) * 100;
+            n.y = Math.sin(angle) * 100;
         });
 
         return { graphNodes: gNodes, graphEdges: gEdges };
@@ -89,12 +111,12 @@ export default function BookmarksGraphView({ nodes = [], query = '', onSelectNod
         const simulate = () => {
             if (!isRunning) return;
 
-            // Physics step
-            const repulsion = 500;
-            const springLength = 80;
-            const springK = 0.035;
-            const centerGravity = 0.008;
-            const damping = 0.86;
+            // Physics step tuned for clean breathing room between clusters
+            const repulsion = 4200;
+            const springLength = 150;
+            const springK = 0.018;
+            const centerGravity = 0.0016;
+            const damping = 0.88;
 
             // Node repulsion
             for (let i = 0; i < graphNodes.length; i++) {
@@ -228,19 +250,22 @@ export default function BookmarksGraphView({ nodes = [], query = '', onSelectNod
                 }
 
                 // Label
-                ctx.font = n.isConnector ? '600 11px system-ui, sans-serif' : '400 10px system-ui, sans-serif';
+                ctx.font = n.isConnector ? '600 11.5px system-ui, sans-serif' : '500 10px system-ui, sans-serif';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'top';
 
-                const labelY = n.y + n.radius + 4;
-                const displayTitle = n.title.length > 24 ? n.title.slice(0, 22) + '...' : n.title;
+                const labelY = n.y + n.radius + 5;
+                const displayTitle = n.isConnector 
+                    ? n.title 
+                    : (n.title.length > 22 ? n.title.slice(0, 20) + '...' : n.title);
 
-                // Subtle text background pill for readability
-                const textWidth = ctx.measureText(displayTitle).width;
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-                ctx.fillRect(n.x - textWidth / 2 - 4, labelY - 1, textWidth + 8, 14);
+                // High readability text halo instead of bulky solid boxes
+                ctx.lineJoin = 'round';
+                ctx.lineWidth = 3.5;
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+                ctx.strokeText(displayTitle, n.x, labelY);
 
-                ctx.fillStyle = n.isConnector ? '#1c1917' : '#57534e';
+                ctx.fillStyle = n.isConnector ? '#1c1917' : (isHovered ? '#111827' : '#57534e');
                 ctx.fillText(displayTitle, n.x, labelY);
 
                 ctx.restore();
@@ -384,12 +409,18 @@ export default function BookmarksGraphView({ nodes = [], query = '', onSelectNod
                 className="w-full h-full cursor-grab active:cursor-grabbing block"
             />
 
-            {/* Floating Top Stats */}
-            <div className="absolute top-3 left-3 flex items-center gap-2 bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/60 shadow-xs pointer-events-none">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span className="text-[10px] font-mono uppercase tracking-wider text-stone-600 font-medium">
-                    {graphNodes.length} nodes · {graphEdges.length} connections
-                </span>
+            {/* Floating Top Stats & Redirection Notice */}
+            <div className="absolute top-3 left-3 flex items-center gap-2 pointer-events-none flex-wrap">
+                <div className="flex items-center gap-2 bg-white/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/60 shadow-xs">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-stone-600 font-medium">
+                        {graphNodes.length} nodes · {graphEdges.length} connections
+                    </span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-stone-200/60 shadow-xs text-[11px] text-stone-600 font-sans">
+                    <i className="fa-solid fa-arrow-up-right-from-square text-[9px] text-stone-400"></i>
+                    <span>Clicking on any node will redirect you to that link.</span>
+                </div>
             </div>
 
             {/* Floating Controls */}
