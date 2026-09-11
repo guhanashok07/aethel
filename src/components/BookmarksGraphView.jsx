@@ -149,13 +149,26 @@ export default function BookmarksGraphView({ nodes = [], query = '', onSelectNod
             }
 
             // Render step
-            const width = canvas.width;
-            const height = canvas.height;
-            ctx.clearRect(0, 0, width, height);
+            const container = containerRef.current;
+            if (!container) return;
+            const rect = container.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+
+            const targetWidth = Math.round(rect.width * dpr);
+            const targetHeight = Math.round(rect.height * dpr);
+            if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                canvas.style.width = `${rect.width}px`;
+                canvas.style.height = `${rect.height}px`;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             ctx.save();
-            // Center of canvas plus pan and zoom
-            ctx.translate(width / 2 + pan.x, height / 2 + pan.y);
+            ctx.scale(dpr, dpr);
+            // Center of canvas in CSS pixels plus pan and zoom
+            ctx.translate(rect.width / 2 + pan.x, rect.height / 2 + pan.y);
             ctx.scale(zoom, zoom);
 
             const needle = query.trim().toLowerCase();
@@ -254,12 +267,10 @@ export default function BookmarksGraphView({ nodes = [], query = '', onSelectNod
             if (!canvas || !container) return;
             const dpr = window.devicePixelRatio || 1;
             const rect = container.getBoundingClientRect();
-            canvas.width = rect.width * dpr;
-            canvas.height = rect.height * dpr;
+            canvas.width = Math.round(rect.width * dpr);
+            canvas.height = Math.round(rect.height * dpr);
             canvas.style.width = `${rect.width}px`;
             canvas.style.height = `${rect.height}px`;
-            const ctx = canvas.getContext('2d');
-            if (ctx) ctx.scale(dpr, dpr);
         };
 
         handleResize();

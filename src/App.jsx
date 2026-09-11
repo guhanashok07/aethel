@@ -13,60 +13,61 @@ import BudgetModal from './components/BudgetModal';
 
 
 // Static Defaults
+// Static Defaults - Professional Focus & Wellness Habits
 const defaultHabitGroups = [
     {
         id: 'morning',
-        label: 'Morning Routine',
+        label: 'Morning Focus Ritual',
         icon: '☀️',
         items: [
-            { id: 'water_am', label: 'Water', done: false },
-            { id: 'skincare_vitc', label: 'Skin care: Vitamin C / Niacinamide', done: false },
-            { id: 'skincare_moist', label: 'Skin care: Moisturizer & sunscreen', done: false },
-            { id: 'supplements', label: 'Supplements: Finasteride, Seeds, Gummies & Fish oil', done: false },
+            { id: 'water_am', label: 'Hydration & Morning Tea', done: false },
+            { id: 'mindfulness', label: '10-min Mindfulness & Breathing', done: false },
+            { id: 'priorities', label: 'Identify Top 3 High-Impact Priorities', done: false },
+            { id: 'stretching', label: 'Light Mobility & Posture Stretch', done: false },
         ]
     },
     {
         id: 'health',
-        label: 'Health',
+        label: 'Movement & Wellness',
         icon: '❤️',
         items: [
-            { id: 'morning_exercise', label: 'Morning exercise / jogging', done: false },
-            { id: 'gym', label: 'Gym', done: false }
+            { id: 'morning_walk', label: 'Morning 20-min Walk in Nature', done: false },
+            { id: 'workout', label: 'Strength Training or Cardio Session', done: false }
         ]
     },
     {
-        id: 'food',
-        label: 'Food',
+        id: 'nutrition',
+        label: 'Nutrition & Energy',
         icon: '🥗',
         items: [
-            { id: 'water_lots', label: 'Lot of water', done: false },
-            { id: 'protein_shake', label: 'Protein shake', done: false },
-            { id: 'eggs', label: '4–6 eggs', done: false },
-            { id: 'meals', label: 'Healthy breakfast, lunch & dinner', done: false },
-            { id: 'yogurt', label: 'Yogurt', done: false },
+            { id: 'water_daily', label: '2L Daily Hydration Target', done: false },
+            { id: 'wholesome_breakfast', label: 'High-Protein Wholesome Breakfast', done: false },
+            { id: 'clean_lunch', label: 'Balanced Mediterranean Lunch', done: false },
+            { id: 'healthy_snack', label: 'Fresh Fruits & Roasted Nuts', done: false },
+            { id: 'light_dinner', label: 'Light Dinner before 8:00 PM', done: false },
         ]
     },
     {
         id: 'career',
-        label: 'Career',
+        label: 'Product & Deep Work',
         icon: '💼',
         items: [
-            { id: 'portfolio', label: 'Portfolio', done: false },
-            { id: 'building', label: 'Building', done: false },
-            { id: 'product_prep', label: 'Product prep', done: false },
-            { id: 'job_work', label: 'Job work: applications, interviews, networking', done: false },
-            { id: 'tech_ld', label: 'Technical L&D', done: false },
-            { id: 'vocab_comm', label: 'Vocab & communication', done: false },
-            { id: 'startup_work', label: 'Startup Work', done: false },
+            { id: 'metrics_review', label: 'Product Metrics & Retention Dashboard', done: false },
+            { id: 'spec_writing', label: 'PRD & Spec Writing (Zero Distractions)', done: false },
+            { id: 'user_insights', label: 'Review Customer Feedback & Support Tickets', done: false },
+            { id: 'standup_sync', label: 'Engineering Standup & Roadmap Alignment', done: false },
+            { id: 'tech_reading', label: 'System Architecture & Tech Reading', done: false },
+            { id: 'async_comms', label: 'Clear Inbox & Async Updates (Inbox Zero)', done: false },
+            { id: 'side_build', label: 'MVP Prototyping & Experimentation', done: false },
         ]
     },
     {
         id: 'night',
-        label: 'Night Routine',
+        label: 'Evening Wind-Down',
         icon: '🌙',
         items: [
-            { id: 'minoxidil', label: 'Minoxidil', done: false },
-            { id: 'retinol', label: 'Retinol & moisturizer', done: false },
+            { id: 'screen_cutoff', label: 'Screen Cut-Off 45m before Sleep', done: false },
+            { id: 'night_journal', label: 'Daily Reflection & Tomorrow Planning', done: false },
         ]
     }
 ];
@@ -235,6 +236,15 @@ export default function App() {
             });
         }
     }, [entities, deleteEntity, saveEntity]);
+
+    // Auto-clean any legacy checklist journal entities containing sensitive habit data
+    useEffect(() => {
+        if (!entities || entities.length === 0) return;
+        const legacyChecklists = entities.filter(e => e.type === 'journal' && e.id.startsWith('checklist-'));
+        if (legacyChecklists.length > 0) {
+            legacyChecklists.forEach(e => deleteEntity(e.id));
+        }
+    }, [entities, deleteEntity]);
 
     // Migrate legacy flat notebook pages into a default notebook container
     useEffect(() => {
@@ -1536,14 +1546,13 @@ export default function App() {
                 checklistDatabase={checklistDatabaseMapped}
                 defaultMorningItems={defaultMorningItems}
                 onToggleZenItem={handleToggleZenItemFromModal}
-                onToggleSkincareDay={() => {
-                    const dateStr = routineModalDay.toLocaleDateString('sv-SE');
-                    const textEl = document.getElementById('skincare-alt-text');
+                onToggleFocusDay={() => {
+                    const textEl = document.getElementById('focus-alt-text');
                     if (textEl) {
-                        if (textEl.textContent.includes("Vitamin C")) {
-                            textEl.textContent = "Today: Niacinamide Alternate overridden";
+                        if (textEl.textContent.includes("Strategy")) {
+                            textEl.textContent = "Today: Customer Discovery & Synthesis overridden";
                         } else {
-                            textEl.textContent = "Today: Vitamin C Serum overridden";
+                            textEl.textContent = "Today: Product Strategy & Architecture overridden";
                         }
                     }
                 }}

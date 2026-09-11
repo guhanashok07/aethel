@@ -293,8 +293,8 @@ const getSeedData = () => {
     return { entities, relations };
 };
 
-const STORAGE_KEY_ENTITIES = 'aethel_entities_v1';
-const STORAGE_KEY_RELATIONS = 'aethel_relations_v1';
+const STORAGE_KEY_ENTITIES = 'aethel_entities_v2';
+const STORAGE_KEY_RELATIONS = 'aethel_relations_v2';
 
 export const useStore = create((set, get) => ({
     // Reactive States
@@ -314,6 +314,20 @@ export const useStore = create((set, get) => ({
     // Initialize Self-Storage
     initAuth: async () => {
         try {
+            // Clean up legacy v1 storage and any old checklist caches to ensure sensitive data is purged
+            try {
+                localStorage.removeItem('aethel_entities_v1');
+                localStorage.removeItem('aethel_relations_v1');
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const k = localStorage.key(i);
+                    if (k && (k.startsWith('checklist-') || k.startsWith('aethel_tasks'))) {
+                        keysToRemove.push(k);
+                    }
+                }
+                keysToRemove.forEach(k => localStorage.removeItem(k));
+            } catch (e) {}
+
             const rawEntities = localStorage.getItem(STORAGE_KEY_ENTITIES);
             const rawRelations = localStorage.getItem(STORAGE_KEY_RELATIONS);
 

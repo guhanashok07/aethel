@@ -7,7 +7,7 @@ export default function RoutineModal({
     checklistDatabase,
     defaultMorningItems,
     onToggleZenItem,
-    onToggleSkincareDay
+    onToggleFocusDay
 }) {
     if (!isOpen) return null;
 
@@ -16,11 +16,11 @@ export default function RoutineModal({
     const doneCount = items.filter(i => i.done).length;
     const percent = Math.round((doneCount / items.length) * 100);
 
-    // Active Skincare Alternation
+    // Active Focus Alternation
     const dayNum = day.getDate();
-    const skincareDayText = (dayNum % 2 === 0)
-        ? "Vitamin C Serum (Even Day Active)"
-        : "Niacinamide / Retinol Alternate (Odd Day Active)";
+    const focusModeText = (dayNum % 2 === 0)
+        ? "Product Strategy & Architecture (Even Day Focus)"
+        : "Customer Discovery & Synthesis (Odd Day Focus)";
 
     return (
         <div id="routine-modal" className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
@@ -31,8 +31,8 @@ export default function RoutineModal({
                             <i className="ph ph-sun-dim text-2xl"></i>
                         </div>
                         <div>
-                            <h3 className="text-xl font-semibold text-stone-900 font-sans">Morning Routine</h3>
-                            <p className="text-xs text-muted">A slow start for high focus</p>
+                            <h3 className="text-xl font-semibold text-stone-900 font-sans">Morning Focus Ritual</h3>
+                            <p className="text-xs text-muted">A calm start for intentional execution</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-1 text-muted hover:text-stone-900 transition">
@@ -42,7 +42,7 @@ export default function RoutineModal({
 
                 <div className="p-6 space-y-4">
                     <p className="text-xs text-muted leading-relaxed font-medium">
-                        Suggested window: <span className="text-stone-900 font-semibold">6:00 AM – 7:30 AM</span>. 
+                        Suggested window: <span className="text-stone-900 font-semibold">6:00 AM - 7:30 AM</span>. 
                         Complete items at your own pace. Checking these off updates your daily completion score in real-time.
                     </p>
 
@@ -69,13 +69,13 @@ export default function RoutineModal({
                         ))}
                     </div>
 
-                    {/* Alternative Day Switcher (Vitamin C vs Niacinamide) */}
+                    {/* Focus Cadence Alternation */}
                     <div className="p-3 bg-canvas border border-border rounded-lg flex items-center justify-between shadow-sm">
                         <div>
-                            <p className="text-xs font-semibold text-stone-900">Active Skincare Alternation</p>
-                            <p className="text-[10px] text-muted font-medium" id="skincare-alt-text">Today: {skincareDayText}</p>
+                            <p className="text-xs font-semibold text-stone-900">Focus Cadence Alternation</p>
+                            <p className="text-[10px] text-muted font-medium" id="focus-alt-text">Today: {focusModeText}</p>
                         </div>
-                        <button onClick={onToggleSkincareDay} className="px-2.5 py-1 bg-panel text-xs rounded hover:bg-border transition text-sand hover:text-stone-900 border border-border shadow-sm">
+                        <button onClick={onToggleFocusDay} className="px-2.5 py-1 bg-panel text-xs rounded hover:bg-border transition text-sand hover:text-stone-900 border border-border shadow-sm">
                             Switch Active
                         </button>
                     </div>
